@@ -9,7 +9,7 @@ from rofication import Notification, Urgency
 
 class BaseInterceptor:
 
-    def intercept(self, notification: Notification):
+    def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Intercepted {notification.summary}")
         return False
 
@@ -91,6 +91,14 @@ class ConfiguredInterceptor(BaseInterceptor):
                 return True
         return False
 
+    def get_config_bool(self, key, default=False):
+        if key in self.config:
+            if self.config[key] in ['true', '1', 't', 'y', 'yes']:
+                return True
+            elif self.config[key] in ['false', '0', 'f', 'n', 'no']:
+                return False
+        return default
+
 #https://gist.github.com/kirpit/1306188/ab800151c9128db3b763bb9f9ec19fda0df3a843
 class Dispatcher:
 
@@ -117,7 +125,7 @@ class Dispatcher:
 class NagBarInterceptor(ConfiguredInterceptor):
 
 
-    def intercept(self, notification: Notification):
+    def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
         if notification.urgency == Urgency.CRITICAL:
             self.dispatch_nagbar(notification)
             return
@@ -126,16 +134,16 @@ class NagBarInterceptor(ConfiguredInterceptor):
         blacklisted = self.matches_any_in(notification, self.blacklist)
         # TODO: Order should be configurable
         if whitelisted and not blacklisted:
-            self.dispatch_nagbar(notification)
+            self.dispatch_nagbar(notification, on_viewed)
 
 
-    def dispatch_nagbar(self, notification: Notification):
+    def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Displaying nagbar for {notification.summary}")
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
         cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
 
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
-        #subprocess.Popen(cmd)
+            on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
         Dispatcher(cmd, callback).run(timeout=30)
         #TODO: The nagbar can deal with actions, implement them
