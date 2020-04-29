@@ -15,7 +15,7 @@ class RegExInterceptor(BaseInterceptor):
 
     KEYS = ["all", "summary", "body", "application"]
 
-    def __init__(self, matchers_path='~/.config/rotifications/matchers'):
+    def __init__(self, matchers_path='~/.config/regolith/rofications/matchers'):
         matchers_path = os.path.expanduser(matchers_path)
         self.matchers = []
         with open(matchers_path, 'r') as f:
