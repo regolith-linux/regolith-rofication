@@ -20,7 +20,7 @@ class RegExInterceptor(BaseInterceptor):
         self.matchers = []
         with open(matchers_path, 'r') as f:
             for i, line in enumerate(f.readlines()):
-                if not self.parse_line(line):
+                if not self.parse_line(line.rstrip('\n')):
                     warn(f"Could not compile RegEx {line} on {matchers_path} line {i}")
         print(f"Loaded matchers {self.matchers}")
         # TODO: Deal with files that don't exist
