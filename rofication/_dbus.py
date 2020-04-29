@@ -5,6 +5,7 @@ from dbus import service, SessionBus
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository.GLib import MainLoop
 
+from ._interceptor import BaseInterceptor
 from ._metadata import ROFICATION_VERSION, ROFICATION_NAME, ROFICATION_URL
 from ._notification import Notification, Urgency
 from ._queue import NotificationQueue
@@ -14,7 +15,7 @@ NOTIFICATIONS_DBUS_OBJECT_PATH = '/org/freedesktop/Notifications'
 
 
 class RoficationDbusObject(service.Object):
-    def __init__(self, queue: NotificationQueue) -> None:
+    def __init__(self, queue: NotificationQueue, interceptor: BaseInterceptor) -> None:
         super().__init__(
             object_path=NOTIFICATIONS_DBUS_OBJECT_PATH,
             bus_name=service.BusName(
@@ -23,6 +24,7 @@ class RoficationDbusObject(service.Object):
             )
         )
         self._queue: NotificationQueue = queue
+        self._interceptor: BaseInterceptor = interceptor
 
         def notification_seen(notification):
             if 'default' in notification.actions:
@@ -71,13 +73,16 @@ class RoficationDbusObject(service.Object):
             notification.urgency = Urgency(int(hints['urgency']))
         with self._queue.lock:
             self._queue.put(notification)
+
+        self._interceptor.intercept(notification)
+
         return notification.id
 
 
 class RoficationDbusService:
-    def __init__(self, queue: NotificationQueue) -> None:
+    def __init__(self, queue: NotificationQueue, interceptor: BaseInterceptor) -> None:
         # preserve D-Bus object reference
-        self._object = RoficationDbusObject(queue)
+        self._object = RoficationDbusObject(queue, interceptor)
         # create GLib mainloop, this is needed to make D-Bus work and takes care of catching signals.
         self._loop = MainLoop()
 
