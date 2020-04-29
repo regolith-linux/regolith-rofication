@@ -35,7 +35,7 @@ class ConfiguredInterceptor(BaseInterceptor):
 
     KEYS = ["all", "summary", "body", "application"]
 
-    def __init__(self, matchers_path='~/.config/regolith/rofications/matchers'):
+    def __init__(self, matchers_path='~/.config/regolith/rofications/config'):
         matchers_path = os.path.expanduser(matchers_path)
 
         self.config = {}
