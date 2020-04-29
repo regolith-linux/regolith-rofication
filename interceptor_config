@@ -1,0 +1,7 @@
+[config]
+consume_on_display=false
+always_display_critical=true
+
+[whitelist]
+
+[blacklist]
