@@ -42,6 +42,7 @@ class NagBarInterceptor(RegExInterceptor):
                 return
 
     def dispatch_nagbar(self, notification: Notification):
+        subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
         cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
         subprocess.Popen(cmd)
         print(f"Opened nagbar for {notification.summary}")
