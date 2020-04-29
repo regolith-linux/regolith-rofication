@@ -1,5 +1,5 @@
 [config]
-consume_on_display=false
+consume_on_dismiss=false
 always_display_critical=true
 
 [whitelist]

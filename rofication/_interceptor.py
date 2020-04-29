@@ -13,7 +13,24 @@ class BaseInterceptor:
         print(f"Intercepted {notification.summary}")
         return False
 
+"""
+Loads a configuration file in similar to i3blocks
+Composed of three sections:
+[config]
+key=value 
 
+List of config values
+[whitelist]
+all:re1
+summary:re2
+body:re3
+application:re4
+[blacklist]
+
+Pairs of keys and RegEx matchers.
+Keys correspond to a part of the notification. 
+"all" matches on all parts.
+"""
 class ConfiguredInterceptor(BaseInterceptor):
 
     KEYS = ["all", "summary", "body", "application"]
@@ -25,8 +42,11 @@ class ConfiguredInterceptor(BaseInterceptor):
         self.whitelist = []
         self.blacklist = []
         self.matchers = []
+        # TODO: Deal with files that don't exist
+        # TODO: Watch the file for updates?
         with open(matchers_path, 'r') as f:
             mode = ""
+            # TODO: Log errors
             for i, line in enumerate(f.readlines()):
                 line = line.rstrip()
 
@@ -47,8 +67,7 @@ class ConfiguredInterceptor(BaseInterceptor):
                 #     warn(f"Could not compile RegEx {line} on {matchers_path} line {i}")
         print(f"Loaded whitelist {self.whitelist}")
         print(f"Loaded blacklist {self.blacklist}")
-        # TODO: Deal with files that don't exist
-        # TODO: Watch the file for updates?
+
 
     def parse_whitelist(self, line) -> bool:
         matcher = self.parse_matcher(line)
@@ -100,6 +119,9 @@ class ConfiguredInterceptor(BaseInterceptor):
         return default
 
 #https://gist.github.com/kirpit/1306188/ab800151c9128db3b763bb9f9ec19fda0df3a843
+"""
+Run a command in a new thread, with a timeout. Then execute a callback, giving the command return code
+"""
 class Dispatcher:
 
     def __init__(self, cmd, callback: Callable[[int], None]):
@@ -122,11 +144,12 @@ class Dispatcher:
 
         self.callback(self.process.returncode)
 
+
 class NagBarInterceptor(ConfiguredInterceptor):
 
 
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
-        if notification.urgency == Urgency.CRITICAL:
+        if notification.urgency == Urgency.CRITICAL and self.get_config_bool("always_display_critical"):
             self.dispatch_nagbar(notification)
             return
 
@@ -147,3 +170,4 @@ class NagBarInterceptor(ConfiguredInterceptor):
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
         Dispatcher(cmd, callback).run(timeout=30)
         #TODO: The nagbar can deal with actions, implement them
+
