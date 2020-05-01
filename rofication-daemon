@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 from rofication import RoficationServer, NotificationQueue, RoficationDbusService
-from rofication._interceptor import NagBarInterceptor
+from rofication._interceptor import DefaultInterceptor
 
 if __name__ == '__main__':
     not_queue = NotificationQueue.load('not.json')
-    interceptor = NagBarInterceptor()
+    interceptor = DefaultInterceptor()
 
     service = RoficationDbusService(not_queue, interceptor)
 
