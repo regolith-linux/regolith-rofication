@@ -14,7 +14,9 @@ class BaseInterceptor:
         print(f"Intercepted {notification.summary}")
         return False
 
-
+# Watches a single file
+# TODO: The callback provides no information
+# it works, but isn't very clear
 class Watcher(pyinotify.ProcessEvent):
 
     def __init__(self, path: str, callback: Callable[[], None]):
@@ -50,8 +52,8 @@ class ConfiguredInterceptor(BaseInterceptor):
 
 
 
-    def __init__(self, matchers_path='~/.config/regolith/rofications/config'):
-        matchers_path = os.path.expanduser(matchers_path)
+    def __init__(self, config_path='~/.config/regolith/rofications/config'):
+        config_path = os.path.expanduser(config_path)
 
         self.config = {}
         self.whitelist = []
@@ -61,13 +63,16 @@ class ConfiguredInterceptor(BaseInterceptor):
 
         def read():
             print(f"Loading config file")
-            self.read_file(matchers_path)
+            self.read_file(config_path)
 
 
+
+        folder = os.path.dirname(os.path.abspath(config_path))
         wm1 = pyinotify.WatchManager()
-        notifier1 = pyinotify.ThreadedNotifier(wm1, default_proc_fun=Watcher(matchers_path, read))
+        notifier1 = pyinotify.ThreadedNotifier(wm1, default_proc_fun=Watcher(config_path, read))
         notifier1.start()
-        wm1.add_watch('/home/theo/.config/regolith/rofications/', pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
+
+        wm1.add_watch(folder, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
 
         read()
         print(f"Loaded whitelist {self.whitelist}")
