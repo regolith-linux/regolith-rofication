@@ -4,15 +4,27 @@ from warnings import warn
 from typing import Callable, List, Tuple, Pattern
 import subprocess
 import threading
+import pyinotify
 from rofication import Notification, Urgency
 
-from tkinter import *
 
 class BaseInterceptor:
 
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Intercepted {notification.summary}")
         return False
+
+
+class Watcher(pyinotify.ProcessEvent):
+
+    def __init__(self, path: str, callback: Callable[[], None]):
+        self.path = path
+        self.callback = callback
+
+    def process_default(self, event):
+        print(f"Event {event}")
+        if event.pathname == self.path:
+            self.callback()
 
 """
 Loads a configuration file in similar to i3blocks
@@ -36,6 +48,8 @@ class ConfiguredInterceptor(BaseInterceptor):
 
     KEYS = ["all", "summary", "body", "application"]
 
+
+
     def __init__(self, matchers_path='~/.config/regolith/rofications/config'):
         matchers_path = os.path.expanduser(matchers_path)
 
@@ -44,8 +58,24 @@ class ConfiguredInterceptor(BaseInterceptor):
         self.blacklist = []
         self.matchers = []
         # TODO: Deal with files that don't exist
-        # TODO: Watch the file for updates?
-        with open(matchers_path, 'r') as f:
+
+        def read():
+            print(f"Loading config file")
+            self.read_file(matchers_path)
+
+
+        wm1 = pyinotify.WatchManager()
+        notifier1 = pyinotify.ThreadedNotifier(wm1, default_proc_fun=Watcher(matchers_path, read))
+        notifier1.start()
+        wm1.add_watch('/home/theo/.config/regolith/rofications/', pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
+
+        read()
+        print(f"Loaded whitelist {self.whitelist}")
+        print(f"Loaded blacklist {self.blacklist}")
+
+
+    def read_file(self, path):
+        with open(path, 'r') as f:
             mode = ""
             # TODO: Log errors
             for i, line in enumerate(f.readlines()):
@@ -63,12 +93,6 @@ class ConfiguredInterceptor(BaseInterceptor):
                         self.parse_blacklist(line)
                     else:
                         warn(f"Unrecognised config mode {mode}")
-
-                # if not self.parse_line(line.rstrip('\n')):
-                #     warn(f"Could not compile RegEx {line} on {matchers_path} line {i}")
-        print(f"Loaded whitelist {self.whitelist}")
-        print(f"Loaded blacklist {self.blacklist}")
-
 
     def parse_whitelist(self, line) -> bool:
         matcher = self.parse_matcher(line)
@@ -159,8 +183,8 @@ class NagBarInterceptor(ConfiguredInterceptor):
     def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Displaying nagbar for {notification.summary}")
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
-        #cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
-        cmd = ("python3", "/home/theo/Documents/notifbar/bar.py")
+        cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
+
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
