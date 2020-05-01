@@ -67,6 +67,7 @@ class RoficationDbusObject(service.Object):
         notification.summary = summary
         notification.body = body
         notification.actions = tuple(actions)
+        notification.app_icon = app_icon
         if int(expire_timeout) > 0:
             notification.deadline = time.time() + expire_timeout / 1000.0
         if 'urgency' in hints:

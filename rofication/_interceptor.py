@@ -7,19 +7,31 @@ import threading
 import pyinotify
 from rofication import Notification, Urgency
 
-
+"""
+A notification interceptor takes a notification and displays it
+"""
 class BaseInterceptor:
 
+
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
+        """
+        Displays a notification to the user an invoked on_viewed
+        :param notification: Notification to display
+        :param on_viewed: Callback invoked on view. Boolean argument indicates whether the notification should be
+        considered dismissed
+        """
         print(f"Intercepted {notification.summary}")
         return False
 
-# Watches a single file
-# TODO: The callback provides no information
-# it works, but isn't very clear
+# TODO: Is there a cleaner way to do this?
 class Watcher(pyinotify.ProcessEvent):
 
     def __init__(self, path: str, callback: Callable[[], None]):
+        """
+        Watches a single file via pyinotify
+        :param path: File to watch
+        :param callback: Callback invoked on change
+        """
         self.path = path
         self.callback = callback
 
@@ -29,30 +41,16 @@ class Watcher(pyinotify.ProcessEvent):
             self.callback()
 
 """
-Loads a configuration file in similar to i3blocks
-Composed of three sections:
-[config]
-key=value 
-
-List of config values
-[whitelist]
-all:re1
-summary:re2
-body:re3
-application:re4
-[blacklist]
-
-Pairs of keys and RegEx matchers.
-Keys correspond to a part of the notification. 
-"all" matches on all parts.
+Loads a configuration file and then watches it for changes
+Each time the file is written to, it invokes load_config
 """
 class ConfiguredInterceptor(BaseInterceptor):
 
 
 
-    def __init__(self, config_path='~/.config/regolith/rofications/config'):
-        config_path = os.path.expanduser(config_path)
+    def __init__(self, config_path):
 
+        config_path = os.path.expanduser(config_path)
         self.config = {}
         self.matchers = []
 
@@ -102,17 +100,23 @@ class DefaultInterceptor(ConfiguredInterceptor):
 
     Matcher = NewType("Matcher", Tuple[str, Pattern, bool])
 
+    def __init__(self, config_path='~/.config/regolith/rofications/config'):
+        ConfiguredInterceptor.__init__(self, config_path)
+
+
     def load_config(self, path):
-        if os.path.exists(path):
-            pass
-        if os.path.isfile(path):
-            pass
+        if not os.path.exists(path):
+            warn(f"Path {path} does not exist")
+            return
+        #TODO: Config file without extension isn't detected as file
+        # if os.path.isfile(path):
+        #     warn(f"Path {path} is not file")
+        #     return
         with open(path, 'r') as f:
             mode = ""
             # TODO: Log errors
             for i, line in enumerate(f.readlines()):
                 line = line.rstrip()
-
                 if not line.startswith("#"):
                     if line.startswith("["):
                         mode = line
@@ -125,16 +129,16 @@ class DefaultInterceptor(ConfiguredInterceptor):
                         warn(f"Unrecognised config mode {mode}")
 
     def parse_matcher(self, line):
-        if line[0] == '!':
-            blacklist = True
+        if line[0] == '!':  #blacklist item
+            whitelist = False
             splits = line[:1].split(":", 1)
         else:
-            blacklist = False
+            whitelist = True
             splits = line.split(":", 1)
         # TODO: Support whitespace between key and regex. Or some better format
         if len(splits) == 2 and splits[0] in self.KEYS:
             try:
-                self.matchers.append((splits[0], re.compile(splits[1]), blacklist))
+                self.matchers.append((splits[0], re.compile(splits[1]), whitelist))
             except re.error:
                 pass
         return None
@@ -156,7 +160,8 @@ class DefaultInterceptor(ConfiguredInterceptor):
                 return False
         return default
 
-    def matches(self, notification: Notification, matcher: Matcher):
+    @staticmethod
+    def matches(notification: Notification, matcher: Matcher):
         k, m, _ = matcher
         if ((k == "all" or k == "summary") and m.match(notification.summary)) or \
                 ((k == "all" or k == "body") and m.match(notification.body)) or \
@@ -164,15 +169,18 @@ class DefaultInterceptor(ConfiguredInterceptor):
             return True
 
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
+
+        #TODO: Should urgency rank above matchers?
         if notification.urgency == Urgency.CRITICAL and self.get_config_bool("always_display_critical"):
-            self.dispatch_nagbar(notification)
+            self.dispatch_nagbar(notification, on_viewed)
             return
 
         for m in self.matchers:
             if self.matches(notification, m):
-                print(f"Notificaiton matched {m}")
-                if m[2]:
+                print(f"Notification matched {m}")
+                if m[2]: # whitelisted
                     self.dispatch_nagbar(notification, on_viewed)
+                break
 
 
     def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
@@ -180,6 +188,9 @@ class DefaultInterceptor(ConfiguredInterceptor):
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
         cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
 
+        cmd = "python3", \
+              os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
+              "-m {}".format(notification.summary)
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
