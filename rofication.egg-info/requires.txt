@@ -1,2 +1,0 @@
-PyGObject>=3.26.1
-dbus-python>=1.2.6
