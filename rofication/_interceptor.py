@@ -6,6 +6,7 @@ import subprocess
 import threading
 from rofication import Notification, Urgency
 
+from tkinter import *
 
 class BaseInterceptor:
 
@@ -118,31 +119,26 @@ class ConfiguredInterceptor(BaseInterceptor):
                 return False
         return default
 
-#https://gist.github.com/kirpit/1306188/ab800151c9128db3b763bb9f9ec19fda0df3a843
-"""
-Run a command in a new thread, with a timeout. Then execute a callback, giving the command return code
-"""
-class Dispatcher:
+#https://stackoverflow.com/a/2581943
+def popen_and_call(on_exit: Callable[[int], None], popen_args):
+    """
+    Runs the given args in a subprocess.Popen, and then calls the function
+    on_exit when the subprocess completes.
+    on_exit is a callable object, and popen_args is a list/tuple of args that
+    would give to subprocess.Popen.
+    """
+    def run_in_thread(on_exit, popen_args):
+        print(f"Popen args {popen_args}")
+        proc = subprocess.Popen(*popen_args)
+        proc.wait()
 
-    def __init__(self, cmd, callback: Callable[[int], None]):
-        self.cmd = cmd
-        self.callback = callback
-        self.process = None
+        on_exit(proc.returncode)
+        return
+    thread = threading.Thread(target=run_in_thread, args=(on_exit, popen_args))
+    thread.start()
+    # returns immediately after the thread starts
+    return thread
 
-    def run(self, timeout=0, **kwargs):
-        def target(**kwargs):
-            self.process = subprocess.Popen(self.cmd, **kwargs)
-            self.process.communicate()
-
-        thread = threading.Thread(target=target, kwargs=kwargs)
-        thread.start()
-
-        thread.join(timeout)
-        if thread.is_alive():
-            self.process.terminate()
-            thread.join()
-
-        self.callback(self.process.returncode)
 
 
 class NagBarInterceptor(ConfiguredInterceptor):
@@ -163,11 +159,12 @@ class NagBarInterceptor(ConfiguredInterceptor):
     def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Displaying nagbar for {notification.summary}")
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
-        cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
-
+        #cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
+        cmd = ("python3", "/home/theo/Documents/notifbar/bar.py")
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
-        Dispatcher(cmd, callback).run(timeout=30)
+
+        popen_and_call(callback, (cmd, ))
         #TODO: The nagbar can deal with actions, implement them
 

@@ -1,6 +1,5 @@
 from ._client import RoficationClient
 
-
 from ._notification import Notification, CloseReason, Urgency
 from ._interceptor import BaseInterceptor, ConfiguredInterceptor, NagBarInterceptor
 
