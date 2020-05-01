@@ -186,13 +186,18 @@ class DefaultInterceptor(ConfiguredInterceptor):
     def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
         print(f"Displaying nagbar for {notification.summary}")
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
-        cmd = ("/usr/bin/i3-nagbar", "-m", notification.summary)
+        #cmd = ("/usr/bin/i3-nagbar", "-s", notification.summary)
 
         cmd = "python3", \
               os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
-              "-m {}".format(notification.summary)
+              "-s {}".format(notification.summary,
+                             "-b {}".format(notification.body),
+                             "-i {}".format(notification.app_icon),
+                             "-a {}".format(notification.application),
+                             "-t 5")
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
+            #TODO: As the Python nagbar can send dbus messages, perhaps this should be left up to it
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
 
         popen_and_call(callback, (cmd, ))

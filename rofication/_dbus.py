@@ -39,6 +39,7 @@ class RoficationDbusObject(service.Object):
 
     @service.signal(NOTIFICATIONS_DBUS_INTERFACE, signature='us')
     def ActionInvoked(self, id_in, action_key_in):
+        print(f"ActionInvoked {id_in} {action_key_in}")
         pass
 
     @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='u', out_signature='')
