@@ -38,10 +38,10 @@ class Watcher(pyinotify.ProcessEvent):
         self.path = path
         self.callback = callback
 
-    def process_default(self, event):
+    def process_IN_CLOSE_WRITE(self, event):
         print(f"Event {event}")
         #
-        if event.pathname == self.path and event.mask == pyinotify.IN_CLOSE_WRITE:
+        if event.pathname == self.path:
             self.callback()
 
 """
@@ -60,12 +60,6 @@ class ConfiguredInterceptor(BaseInterceptor):
         def read():
             print(f"Loading config file {config_path}")
             self.load_config(config_path)
-
-        def process_IN_CLOSE_WRITE(event):
-            print(f"Event {event}")
-            #
-            if event.pathname == self.path and event.mask == pyinotify.IN_CLOSE_WRITE:
-                self.callback()
 
         folder = os.path.dirname(os.path.abspath(config_path))
         wm = pyinotify.WatchManager()
@@ -107,6 +101,7 @@ class NagbarInterceptor(ConfiguredInterceptor):
 
     # Notification parameters to match on
     NotificationParts = ["all", "summary", "body", "application", "urgency"]
+    ConfigKeys = ["default_timeout", "consume_on_dismiss"]
 
     Matcher = NewType("Matcher", Tuple[str, Callable[[str], bool], bool])
 
@@ -193,6 +188,11 @@ class NagbarInterceptor(ConfiguredInterceptor):
         splits = line.split("=", 1)
         if len(splits) != 2:
             return f"Config line {line} invalid. Should be 'key=value'"
+        key, value = splits
+        if key not in self.ConfigKeys:
+            return f"Config key {key} not recognised"
+        if key == "default_timeout" and not value.isdigit():
+            return f"default_timeout value {value} is not positive integer"
         self.config[splits[0]] = splits[1]
         print(f"Config entry {splits[0]} : {splits[1]}")
 
@@ -230,11 +230,14 @@ class NagbarInterceptor(ConfiguredInterceptor):
 
         cmd = "python3", \
               os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
-              "-s {}".format(notification.summary,
-                             "-b {}".format(notification.body),
-                             "-i {}".format(notification.app_icon),
-                             "-a {}".format(notification.application),
-                             "-t 5")
+              "-s {}".format(notification.summary), \
+                             "-n {}".format(notification.id), \
+                             "-b {}".format(notification.body), \
+                             "-i {}".format(notification.app_icon), \
+                             "-a {}".format(notification.application)
+        if self.config["default_timeout"] is not None:
+            cmd = cmd + ("-t {}".format(self.config["default_timeout"]),)
+        print(f"Executing command {cmd}")
         def callback(rc):
             print(f"Nagbar closed with code {rc}")
             #TODO: As the Python nagbar can send dbus messages, perhaps this should be left up to it
