@@ -99,9 +99,9 @@ def popen_and_call(on_exit: Callable[[int], None], popen_args):
 class NagbarInterceptor(ConfiguredInterceptor):
 
     # Notification parameters to match on
-    NotificationParts = ["all", "summary", "body", "application"]
+    NotificationParts = ["all", "summary", "body", "application", "urgency"]
 
-    Matcher = NewType("Matcher", Tuple[str, Pattern, bool])
+    Matcher = NewType("Matcher", Tuple[str, Callable[[str], bool], bool])
 
     def __init__(self, config_path='~/.config/regolith/rofications/config'):
         ConfiguredInterceptor.__init__(self, config_path)
@@ -143,8 +143,15 @@ class NagbarInterceptor(ConfiguredInterceptor):
         # TODO: Support whitespace between key and regex. Or some better format
         print(f"Splits {splits}")
         if len(splits) == 2 and splits[0] in self.NotificationParts:
+            key, arg = splits
             try:
-                self.matchers.append((splits[0], re.compile(splits[1]), whitelist))
+                if key == "urgency":
+                    fun = lambda s: s.lower() == arg.lower()
+                else:
+                    pattern = re.compile(arg)
+                    fun = lambda s: pattern.match(s)
+
+                self.matchers.append((splits[0], fun, whitelist))
             except re.error:
                 warn(f"Error parsing line {line}")
                 pass
@@ -177,10 +184,6 @@ class NagbarInterceptor(ConfiguredInterceptor):
 
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
 
-        #TODO: Should urgency rank above matchers?
-        if notification.urgency == Urgency.CRITICAL and self.get_config_bool("always_display_critical"):
-            self.dispatch_nagbar(notification, on_viewed)
-            return
 
         for m in self.matchers:
             if self.matches(notification, m):
