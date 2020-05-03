@@ -141,19 +141,18 @@ class NagbarInterceptor(ConfiguredInterceptor):
             self.display_config_error(f"Error loading config file {ee}")
         if len(errs) > 0:
             warn(f"Errors loading config: {errs}")
-            warning = ""
-            for i, m in errs:
-                warning += f"Line {i}: {m} &#x0a;b"  #Newline parsed by GTK as markup
-            self.display_config_error(err)
+            # &#x0a; is parsed by GTK as a newline
+            warning = "&#x0a;".join([f"Line {i} : {m}" for i, m in errs])
+            self.display_config_error(warning)
 
 
     @staticmethod
     def display_config_error(message):
         cmd = "python3", \
               os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
-              "-s {}".format("Errors parsing notification config",
-                             "-b {}".format(message),
-                             "-a {}".format("rofication-daemon"))
+              "-s", "Errors parsing notification config", \
+                             "-b", message, \
+                             "-a", "rofication-daemon"
         subprocess.Popen(cmd)
 
     def parse_matcher(self, line) -> Optional[str]:
