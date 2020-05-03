@@ -18,6 +18,7 @@ class CloseReason(IntEnum):
 class Notification:
     def __init__(self) -> None:
         self.id: Optional[int] = None
+        self.timeout: Optional[int] = None
         self.deadline: Optional[float] = None
         self.summary: Optional[str] = None
         self.body: Optional[str] = None
@@ -33,6 +34,7 @@ class Notification:
     def make(cls, dct: Mapping[str, any]) -> 'Notification':
         notification: 'Notification' = cls()
         notification.id = dct.get('id')
+        notification.timeout = dct.get('timeout')
         notification.deadline = dct.get('deadline')
         notification.summary = dct.get('summary')
         notification.body = dct.get('body')

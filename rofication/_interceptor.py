@@ -234,8 +234,10 @@ class NagbarInterceptor(ConfiguredInterceptor):
                              "-n {}".format(notification.id), \
                              "-b {}".format(notification.body), \
                              "-i {}".format(notification.app_icon), \
-                             "-a {}".format(notification.application)
-        if self.config["default_timeout"] is not None:
+                             "-a {}".format(notification.application), \
+                             "-t {}".format(notification.timeout)
+        #  -1 timeout is up to interpretation of server http://www.galago-project.org/specs/notification/0.9/x81.html
+        if notification.timeout == -1 and  self.config["default_timeout"] is not None:
             cmd = cmd + ("-t {}".format(self.config["default_timeout"]),)
         print(f"Executing command {cmd}")
         def callback(rc):
