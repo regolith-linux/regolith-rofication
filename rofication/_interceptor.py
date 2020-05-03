@@ -40,7 +40,8 @@ class Watcher(pyinotify.ProcessEvent):
 
     def process_default(self, event):
         print(f"Event {event}")
-        if event.pathname == self.path:
+        #
+        if event.pathname == self.path and event.mask == pyinotify.IN_CLOSE_WRITE:
             self.callback()
 
 """
@@ -60,12 +61,18 @@ class ConfiguredInterceptor(BaseInterceptor):
             print(f"Loading config file {config_path}")
             self.load_config(config_path)
 
+        def process_IN_CLOSE_WRITE(event):
+            print(f"Event {event}")
+            #
+            if event.pathname == self.path and event.mask == pyinotify.IN_CLOSE_WRITE:
+                self.callback()
+
         folder = os.path.dirname(os.path.abspath(config_path))
         wm = pyinotify.WatchManager()
         notifier = pyinotify.ThreadedNotifier(wm, default_proc_fun=Watcher(config_path, read))
         notifier.start()
 
-        wm.add_watch(folder, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
+        wm.add_watch(folder, pyinotify.IN_CLOSE_WRITE, auto_add=True)
 
         read()
         print(f"Loaded matchers {self.matchers}")
