@@ -24,6 +24,9 @@ class BaseInterceptor:
         return False
 
 # TODO: Is there a cleaner way to do this?
+"""
+Event handler which executes a callback for a single file in a watch path
+"""
 class Watcher(pyinotify.ProcessEvent):
 
     def __init__(self, path: str, callback: Callable[[], None]):
@@ -45,7 +48,6 @@ Loads a configuration file and then watches it for changes
 Each time the file is written to, it invokes load_config
 """
 class ConfiguredInterceptor(BaseInterceptor):
-
 
 
     def __init__(self, config_path):
@@ -96,7 +98,8 @@ def popen_and_call(on_exit: Callable[[int], None], popen_args):
 
 class NagbarInterceptor(ConfiguredInterceptor):
 
-    KEYS = ["all", "summary", "body", "application"]
+    # Notification parameters to match on
+    NotificationParts = ["all", "summary", "body", "application"]
 
     Matcher = NewType("Matcher", Tuple[str, Pattern, bool])
 
@@ -133,15 +136,17 @@ class NagbarInterceptor(ConfiguredInterceptor):
     def parse_matcher(self, line):
         if line[0] == '!':  #blacklist item
             whitelist = False
-            splits = line[:1].split(":", 1)
+            splits = line[1:].split(":", 1)
         else:
             whitelist = True
             splits = line.split(":", 1)
         # TODO: Support whitespace between key and regex. Or some better format
-        if len(splits) == 2 and splits[0] in self.KEYS:
+        print(f"Splits {splits}")
+        if len(splits) == 2 and splits[0] in self.NotificationParts:
             try:
                 self.matchers.append((splits[0], re.compile(splits[1]), whitelist))
             except re.error:
+                warn(f"Error parsing line {line}")
                 pass
         return None
 
