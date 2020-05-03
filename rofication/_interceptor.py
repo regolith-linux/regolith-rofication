@@ -101,7 +101,7 @@ class NagbarInterceptor(ConfiguredInterceptor):
 
     # Notification parameters to match on
     NotificationParts = ["all", "summary", "body", "application", "urgency"]
-    ConfigKeys = ["default_timeout", "consume_on_dismiss"]
+    ConfigKeys = ["default_timeout", "dismiss_on_close"]
 
     Matcher = NewType("Matcher", Tuple[str, Callable[[str], bool], bool])
 
@@ -239,11 +239,13 @@ class NagbarInterceptor(ConfiguredInterceptor):
         #  -1 timeout is up to interpretation of server http://www.galago-project.org/specs/notification/0.9/x81.html
         if notification.timeout == -1 and  self.config["default_timeout"] is not None:
             cmd = cmd + ("-t {}".format(self.config["default_timeout"]),)
+        if self.get_config_bool("dismiss_on_close", False):
+            cmd = cmd + ("-d true", )
         print(f"Executing command {cmd}")
-        def callback(rc):
-            print(f"Nagbar closed with code {rc}")
-            #TODO: As the Python nagbar can send dbus messages, perhaps this should be left up to it
-            on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
+        # def callback(rc):
+        #     print(f"Nagbar closed with code {rc}")
+        #     #TODO: As the Python nagbar can send dbus messages, perhaps this should be left up to it
+        #     on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
 
-        popen_and_call(callback, (cmd, ))
+        popen_and_call(lambda b: None, (cmd, ))
 
