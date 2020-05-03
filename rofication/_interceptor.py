@@ -138,19 +138,23 @@ class NagbarInterceptor(ConfiguredInterceptor):
                             errs.append((i, err))
         except EnvironmentError as ee:
             warn(f"Error loading config file {ee}")
+            self.display_config_error(f"Error loading config file {ee}")
         if len(errs) > 0:
             warn(f"Errors loading config: {errs}")
             warning = ""
             for i, m in errs:
-                warning += f"Line {i}: {m} &#x0a;b"
-            cmd = "python3", \
-                  os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
-                  "-s {}".format("Errors parsing notification config",
-                                 "-b {}".format(warning),
-                                 "-a {}".format("rofication-daemon"))
-            subprocess.Popen(cmd)
+                warning += f"Line {i}: {m} &#x0a;b"  #Newline parsed by GTK as markup
+            self.display_config_error(err)
 
 
+    @staticmethod
+    def display_config_error(message):
+        cmd = "python3", \
+              os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
+              "-s {}".format("Errors parsing notification config",
+                             "-b {}".format(message),
+                             "-a {}".format("rofication-daemon"))
+        subprocess.Popen(cmd)
 
     def parse_matcher(self, line) -> Optional[str]:
         if line[0] == '!':  #blacklist item
@@ -172,7 +176,6 @@ class NagbarInterceptor(ConfiguredInterceptor):
             else:
                 pattern = re.compile(arg)
                 fun = lambda s: pattern.match(s)
-
             self.matchers.append((splits[0], fun, whitelist))
         except re.error as er:
             warn(f"Error parsing line {line}")
@@ -182,11 +185,11 @@ class NagbarInterceptor(ConfiguredInterceptor):
 
     def parse_config_key(self, line) -> Optional[str]:
         splits = line.split("=", 1)
-        if len(splits) == 2:
-            self.config[splits[0]] = splits[1]
-            print(f"Config entry {splits[0]} : {splits[1]}")
-            return None
-        return f"Config line {line} invalid. Should be 'key=value'"
+        if len(splits) != 2:
+            return f"Config line {line} invalid. Should be 'key=value'"
+        self.config[splits[0]] = splits[1]
+        print(f"Config entry {splits[0]} : {splits[1]}")
+
 
     def get_config_bool(self, key, default=False):
         if key in self.config:
