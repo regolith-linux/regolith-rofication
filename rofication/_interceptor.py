@@ -55,15 +55,15 @@ class ConfiguredInterceptor(BaseInterceptor):
         self.matchers = []
 
         def read():
-            print(f"Loading config file")
+            print(f"Loading config file {config_path}")
             self.load_config(config_path)
 
         folder = os.path.dirname(os.path.abspath(config_path))
-        wm1 = pyinotify.WatchManager()
-        notifier1 = pyinotify.ThreadedNotifier(wm1, default_proc_fun=Watcher(config_path, read))
-        notifier1.start()
+        wm = pyinotify.WatchManager()
+        notifier = pyinotify.ThreadedNotifier(wm, default_proc_fun=Watcher(config_path, read))
+        notifier.start()
 
-        wm1.add_watch(folder, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
+        wm.add_watch(folder, pyinotify.IN_CLOSE_WRITE, rec=True, auto_add=True)
 
         read()
         print(f"Loaded matchers {self.matchers}")
@@ -94,7 +94,7 @@ def popen_and_call(on_exit: Callable[[int], None], popen_args):
 
 
 
-class DefaultInterceptor(ConfiguredInterceptor):
+class NagbarInterceptor(ConfiguredInterceptor):
 
     KEYS = ["all", "summary", "body", "application"]
 
@@ -102,7 +102,6 @@ class DefaultInterceptor(ConfiguredInterceptor):
 
     def __init__(self, config_path='~/.config/regolith/rofications/config'):
         ConfiguredInterceptor.__init__(self, config_path)
-
 
     def load_config(self, path):
         if not os.path.exists(path):
@@ -112,21 +111,24 @@ class DefaultInterceptor(ConfiguredInterceptor):
         # if os.path.isfile(path):
         #     warn(f"Path {path} is not file")
         #     return
-        with open(path, 'r') as f:
-            mode = ""
-            # TODO: Log errors
-            for i, line in enumerate(f.readlines()):
-                line = line.rstrip()
-                if not line.startswith("#"):
-                    if line.startswith("["):
-                        mode = line
-                        continue
-                    if mode == "[config]":
-                        self.parse_config_key(line)
-                    elif mode == "[list]":
-                        self.parse_matcher(line)
-                    else:
-                        warn(f"Unrecognised config mode {mode}")
+        try:
+            with open(path, 'r') as f:
+                mode = ""
+                # TODO: Log errors
+                for i, line in enumerate(f.readlines()):
+                    line = line.rstrip()
+                    if not line.startswith("#"):
+                        if line.startswith("["):
+                            mode = line
+                            continue
+                        if mode == "[config]":
+                            self.parse_config_key(line)
+                        elif mode == "[list]":
+                            self.parse_matcher(line)
+                        else:
+                            warn(f"Unrecognised config mode {mode}")
+        except EnvironmentError as ee:
+            warn(f"Error loading config file {ee}")
 
     def parse_matcher(self, line):
         if line[0] == '!':  #blacklist item
@@ -201,5 +203,4 @@ class DefaultInterceptor(ConfiguredInterceptor):
             on_viewed(rc == 0 and self.get_config_bool("consume_on_dismiss"))
 
         popen_and_call(callback, (cmd, ))
-        #TODO: The nagbar can deal with actions, implement them
 
