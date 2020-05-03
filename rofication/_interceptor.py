@@ -1,7 +1,7 @@
 import os
 import re
 from warnings import warn
-from typing import Callable, List, Tuple, Pattern, NewType
+from typing import Callable, List, Tuple, Pattern, NewType, Optional
 import subprocess
 import threading
 import pyinotify
@@ -114,26 +114,45 @@ class NagbarInterceptor(ConfiguredInterceptor):
         # if os.path.isfile(path):
         #     warn(f"Path {path} is not file")
         #     return
+        errs = []
         try:
             with open(path, 'r') as f:
                 mode = ""
                 # TODO: Log errors
                 for i, line in enumerate(f.readlines()):
                     line = line.rstrip()
-                    if not line.startswith("#"):
+                    if not line.startswith("#") and line.strip():
                         if line.startswith("["):
                             mode = line
+                            print(f"Set config mode to {mode}")
                             continue
+
                         if mode == "[config]":
-                            self.parse_config_key(line)
+                            err = self.parse_config_key(line)
                         elif mode == "[list]":
-                            self.parse_matcher(line)
+                            err = self.parse_matcher(line)
                         else:
-                            warn(f"Unrecognised config mode {mode}")
+                            err = (i, f"Unrecognised config mode {mode}")
+                        if err is not None:
+                            warn(f"{err} on line {line}")
+                            errs.append((i, err))
         except EnvironmentError as ee:
             warn(f"Error loading config file {ee}")
+        if len(errs) > 0:
+            warn(f"Errors loading config: {errs}")
+            warning = ""
+            for i, m in errs:
+                warning += f"Line {i}: {m} &#x0a;b"
+            cmd = "python3", \
+                  os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
+                  "-s {}".format("Errors parsing notification config",
+                                 "-b {}".format(warning),
+                                 "-a {}".format("rofication-daemon"))
+            subprocess.Popen(cmd)
 
-    def parse_matcher(self, line):
+
+
+    def parse_matcher(self, line) -> Optional[str]:
         if line[0] == '!':  #blacklist item
             whitelist = False
             splits = line[1:].split(":", 1)
@@ -142,29 +161,32 @@ class NagbarInterceptor(ConfiguredInterceptor):
             splits = line.split(":", 1)
         # TODO: Support whitespace between key and regex. Or some better format
         print(f"Splits {splits}")
-        if len(splits) == 2 and splits[0] in self.NotificationParts:
-            key, arg = splits
-            try:
-                if key == "urgency":
-                    fun = lambda s: s.lower() == arg.lower()
-                else:
-                    pattern = re.compile(arg)
-                    fun = lambda s: pattern.match(s)
+        if len(splits) != 2:
+            return f"Matcher {line} invalid. Should be [!]key:RegEx"
+        key, arg = splits
+        if key not in self.NotificationParts:
+            return f"Invalid key {key}. Should be one of {self.NotificationParts}"
+        try:
+            if key == "urgency":
+                fun = lambda s: s.lower() == arg.lower()
+            else:
+                pattern = re.compile(arg)
+                fun = lambda s: pattern.match(s)
 
-                self.matchers.append((splits[0], fun, whitelist))
-            except re.error:
-                warn(f"Error parsing line {line}")
-                pass
+            self.matchers.append((splits[0], fun, whitelist))
+        except re.error as er:
+            warn(f"Error parsing line {line}")
+            return f"Error parsing regex {arg} : {er}"
         return None
 
 
-    def parse_config_key(self, line) -> bool:
+    def parse_config_key(self, line) -> Optional[str]:
         splits = line.split("=", 1)
         if len(splits) == 2:
             self.config[splits[0]] = splits[1]
             print(f"Config entry {splits[0]} : {splits[1]}")
-            return True
-        return False
+            return None
+        return f"Config line {line} invalid. Should be 'key=value'"
 
     def get_config_bool(self, key, default=False):
         if key in self.config:
@@ -177,14 +199,13 @@ class NagbarInterceptor(ConfiguredInterceptor):
     @staticmethod
     def matches(notification: Notification, matcher: Matcher):
         k, m, _ = matcher
-        if ((k == "all" or k == "summary") and m.match(notification.summary)) or \
-                ((k == "all" or k == "body") and m.match(notification.body)) or \
-                ((k == "all" or k == "application") and m.match(notification.application)):
-            return True
+        return ((k == "all" or k == "summary") and m(notification.summary)) or \
+                ((k == "all" or k == "body") and m(notification.body)) or \
+                ((k == "all" or k == "application") and m(notification.application)) or \
+                (k == "urgency" and m(notification.urgency.name))
+
 
     def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
-
-
         for m in self.matchers:
             if self.matches(notification, m):
                 print(f"Notification matched {m}")
