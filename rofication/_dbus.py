@@ -77,13 +77,7 @@ class RoficationDbusObject(service.Object):
         with self._queue.lock:
             self._queue.put(notification)
 
-
-        def handle_dismissal(was_dismissed):
-            if was_dismissed:
-                print(f"Dismissing notification {notification.summary}")
-                self.CloseNotification(notification.id)
-
-        self._interceptor.intercept(notification, handle_dismissal)
+        self._interceptor.intercept(notification)
 
         return notification.id
 

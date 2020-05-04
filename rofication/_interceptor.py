@@ -13,12 +13,10 @@ A notification interceptor takes a notification and displays it
 class BaseInterceptor:
 
 
-    def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
+    def intercept(self, notification: Notification):
         """
         Displays a notification to the user an invoked on_viewed
         :param notification: Notification to display
-        :param on_viewed: Callback invoked on view. Boolean argument indicates whether the notification should be
-        considered dismissed
         """
         print(f"Intercepted {notification.summary}")
         return False
@@ -214,19 +212,18 @@ class NagbarInterceptor(ConfiguredInterceptor):
                 (k == "urgency" and m(notification.urgency.name))
 
 
-    def intercept(self, notification: Notification, on_viewed: Callable[[bool], None]):
+    def intercept(self, notification: Notification):
         for m in self.matchers:
             if self.matches(notification, m):
                 print(f"Notification matched {m}")
                 if m[2]: # whitelisted
-                    self.dispatch_nagbar(notification, on_viewed)
+                    self.dispatch_nagbar(notification)
                 break
 
 
-    def dispatch_nagbar(self, notification: Notification, on_viewed: Callable[[bool], None]):
+    def dispatch_nagbar(self, notification: Notification):
         print(f"Displaying nagbar for {notification.summary}")
         subprocess.Popen(("/usr/bin/i3-msg", "fullscreen", "disable"))
-        #cmd = ("/usr/bin/i3-nagbar", "-s", notification.summary)
 
         cmd = "python3", \
               os.path.join(os.path.expanduser("~/"), "Documents/notifbar/bar.py"), \
