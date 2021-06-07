@@ -2,7 +2,16 @@
 
 import sys
 
-from rofication import RoficationGui, RoficationClient
+from rofication import RoficationGui, RoficationClient, RoficationOptions
+import argparse
+
 
 if __name__ == '__main__':
-    RoficationGui(RoficationClient(sys.stdout)).run()
+    parser = argparse.ArgumentParser(description='Show Rofication GUI')
+    parser.add_argument('--delete_seen', action='store_true',
+                        help='Auto delete seen notification')
+
+    options = RoficationOptions()
+    parser.parse_args(namespace=options)
+
+    RoficationGui(RoficationClient(sys.stdout)).run(options)
