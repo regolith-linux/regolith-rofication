@@ -1,3 +1,4 @@
+import argparse
 import re
 import struct
 import subprocess
@@ -66,6 +67,12 @@ class RoficationOptions:
 
     def __repr__(self):
         return str(self.__dict__)
+
+    def parse_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--delete_seen', action='store_true',
+                            help='Auto delete seen notification')
+        parser.parse_args(namespace=self)
 
 
 class RoficationGui():
