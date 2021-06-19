@@ -18,12 +18,14 @@ class CloseReason(IntEnum):
 class Notification:
     def __init__(self) -> None:
         self.id: Optional[int] = None
+        self.timeout: Optional[int] = None
         self.deadline: Optional[float] = None
         self.summary: Optional[str] = None
         self.body: Optional[str] = None
         self.application: Optional[str] = None
         self.urgency: Urgency = Urgency.NORMAL
         self.actions: Sequence[str] = ()
+        self.app_icon: Optional[str] = None
 
     def asdict(self) -> Mapping[str, any]:
         return {field: value for field, value in vars(self).items() if value is not None}
@@ -32,10 +34,12 @@ class Notification:
     def make(cls, dct: Mapping[str, any]) -> 'Notification':
         notification: 'Notification' = cls()
         notification.id = dct.get('id')
+        notification.timeout = dct.get('timeout')
         notification.deadline = dct.get('deadline')
         notification.summary = dct.get('summary')
         notification.body = dct.get('body')
         notification.application = dct.get('application')
         notification.urgency = Urgency(dct.get('urgency', Urgency.NORMAL))
         notification.actions = tuple(dct.get('actions', ()))
+        notification.app_icon = dct.get('app_icon')
         return notification
