@@ -22,6 +22,7 @@ class Notification:
         self.summary: Optional[str] = None
         self.body: Optional[str] = None
         self.application: Optional[str] = None
+        self.icon: Optional[str] = None
         self.urgency: Urgency = Urgency.NORMAL
         self.actions: Sequence[str] = ()
 
@@ -36,6 +37,7 @@ class Notification:
         notification.summary = dct.get('summary')
         notification.body = dct.get('body')
         notification.application = dct.get('application')
+        notification.icon = dct.get('icon')
         notification.urgency = Urgency(dct.get('urgency', Urgency.NORMAL))
         notification.actions = tuple(dct.get('actions', ()))
         return notification
