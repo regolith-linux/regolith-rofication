@@ -7,7 +7,7 @@ from typing import TextIO
 from ._notification import Urgency, Notification
 from ._queue import NotificationQueue
 from ._static import ROFICATION_UNIX_SOCK
-
+from rofication import resources
 
 class ThreadedUnixStreamServer(ThreadingMixIn, UnixStreamServer):
     def start(self) -> threading.Thread:
@@ -44,7 +44,10 @@ class RoficationRequestHandler(BaseRequestHandler):
 
     def list(self, fp: TextIO) -> None:
         with self.server.queue.lock:
-            json.dump(list(self.server.queue), fp, default=Notification.asdict)
+            messages = list(self.server.queue)
+            if resources.oldest_first.fetch() != 'true':
+                messages.reverse()
+            json.dump(messages, fp, default=Notification.asdict)
 
     def see(self, nid: int) -> None:
         with self.server.queue.lock:
