@@ -3,6 +3,7 @@ import os
 import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
 from typing import TextIO
+from operator import itemgetter
 
 from ._notification import Urgency, Notification
 from ._queue import NotificationQueue
@@ -45,8 +46,12 @@ class RoficationRequestHandler(BaseRequestHandler):
     def list(self, fp: TextIO) -> None:
         with self.server.queue.lock:
             messages = list(self.server.queue)
-            if resources.oldest_first.fetch() != 'true':
-                messages.reverse()
+            sort_fields = resources.notify_sort_by.fetch().split()
+            sort_fields.reverse()
+            for sort_field in sort_fields:
+                reverse = sort_field.startswith("!")
+                sort_field = sort_field.lstrip("!")
+                messages.sort(key=lambda message: message.asdict()[sort_field], reverse=reverse )
             json.dump(messages, fp, default=Notification.asdict)
 
     def see(self, nid: int) -> None:
