@@ -3,7 +3,6 @@ import os
 import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
 from typing import TextIO
-from operator import itemgetter
 
 from ._notification import Urgency, Notification
 from ._queue import NotificationQueue
