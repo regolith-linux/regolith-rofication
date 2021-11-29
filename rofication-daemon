@@ -1,16 +1,37 @@
 #!/usr/bin/env python3
 
 import os
+import signal
 from pathlib import Path
 from rofication import RoficationServer, NotificationQueue, RoficationDbusService
+from rofication._util import Resource
 
-if __name__ == '__main__':
-    queue_dir = os.path.expanduser('~/.cache/rofication')
+if __name__ == "__main__":
+    queue_dir = os.path.expanduser("~/.cache/rofication")
     Path(queue_dir).mkdir(parents=True, exist_ok=True)
 
     queue_file = os.path.join(queue_dir, "notifications.json")
     not_queue = NotificationQueue.load(queue_file)
-    service = RoficationDbusService(not_queue)
+
+    try:
+        save_interval = int(
+            Resource(
+                env_name="rofication_savetodisk_format",
+                xres_name="rofication.savetodisk.format",
+                default="0",
+            ).fetch()
+        )
+    except ValueError:
+        save_interval = 0
+
+    service = RoficationDbusService(not_queue, save_interval)
+
+    def sigterm_handler(sig, frame):
+        print("SIGTERM received, terminating.")
+        not_queue.save_if_dirty()
+        service.quit()
+
+    signal.signal(signal.SIGTERM, sigterm_handler)
 
     with RoficationServer(not_queue) as server:
         server.start()
@@ -19,4 +40,4 @@ if __name__ == '__main__':
         except:
             server.shutdown()
 
-    not_queue.save(queue_file)
+    not_queue.save()
