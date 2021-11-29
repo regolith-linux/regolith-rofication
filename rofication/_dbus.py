@@ -90,15 +90,17 @@ class RoficationDbusObject(service.Object):
 
 
 class RoficationDbusService:
-    def __init__(self, queue: NotificationQueue) -> None:
+    def __init__(self, queue: NotificationQueue, save_interval) -> None:
         # preserve D-Bus object reference
         self.queue = queue
+        self.save_interval = save_interval
         self._object = RoficationDbusObject(queue)
         # create GLib mainloop, this is needed to make D-Bus work and takes care of catching signals.
         self._loop = MainLoop()
 
     def run(self) -> None:
-        timeout_add_seconds(60, self.backup_queue)
+        if self.save_interval > 0:
+            timeout_add_seconds(self.save_interval, self.backup_queue)
         self._loop.run()
 
     def quit(self) -> None:
