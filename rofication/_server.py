@@ -8,6 +8,7 @@ from ._notification import Urgency, Notification
 from ._queue import NotificationQueue
 from ._static import ROFICATION_UNIX_SOCK
 from rofication import resources
+from datetime import datetime
 
 class ThreadedUnixStreamServer(ThreadingMixIn, UnixStreamServer):
     def start(self) -> threading.Thread:
@@ -44,14 +45,21 @@ class RoficationRequestHandler(BaseRequestHandler):
 
     def list(self, fp: TextIO) -> None:
         with self.server.queue.lock:
+            sorting_messages = list()
             messages = list(self.server.queue)
             sort_fields = resources.notify_sort_by.fetch().split()
             sort_fields.reverse()
             for sort_field in sort_fields:
                 reverse = sort_field.startswith("!")
                 sort_field = sort_field.lstrip("!")
-                messages.sort(key=lambda message: message.asdict()[sort_field], reverse=reverse )
-            json.dump(messages, fp, default=Notification.asdict)
+                try:
+                    messages.sort(key=lambda message: message.asdict()[sort_field], reverse=reverse )
+                except KeyError:
+                    sorting_messages.append(Notification.make({'summary':f'Field {sort_field} does not exist', 
+                    'body': 'Check i3xrocks_notify_sort_by in XResource. Common sorting field are timestamp and urgency.',
+                     'urgency': Urgency.CRITICAL, 'timestamp': datetime.now().timestamp(), 'application':'rofication-daemon',
+                     'id': -len(sorting_messages)}))
+            json.dump(sorting_messages + messages, fp, default=Notification.asdict)
 
     def see(self, nid: int) -> None:
         with self.server.queue.lock:
