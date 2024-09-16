@@ -29,7 +29,7 @@ class Resource:
 
         # avoid calling xrescat if the environment variable is set
         if env_val is None:
-            cmd = ('/usr/bin/xrescat', self.xres_name, self.default)
+            cmd = ('xrescat', self.xres_name, self.default)
             return check_output(cmd, universal_newlines=True)
         else:
             return env_val
