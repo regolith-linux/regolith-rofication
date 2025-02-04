@@ -1,3 +1,15 @@
+regolith-rofication (1.5.1) focal; urgency=medium
+
+  [ Khosrow Moossavi ]
+  * chore: remove obsolete package broadcast action
+  * feat: enable github action to test pull requests
+  * feat: enable github action to publish to unstable
+  * feat: enable github action to publish to testing
+  * feat: enable github action to prepare release
+  * fix: create release tag from correct git sha
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Tue, 04 Feb 2025 03:21:59 +0000
+
 regolith-rofication (1.5.0) focal; urgency=medium
 
   [ Agustín Cisneros ]
