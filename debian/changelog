@@ -1,3 +1,13 @@
+regolith-rofication (1.5.3) focal; urgency=medium
+
+  [ zackattackz ]
+  * Use xrescat in PATH (#21)
+
+  [ Ken Gilmer ]
+  * fix: add new dependency in ubuntu-plucky and similar.  Fixes build issue w/ distutils
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Tue, 04 Nov 2025 03:40:40 +0000
+
 regolith-rofication (1.5.2) focal; urgency=medium
 
   [ Khosrow Moossavi ]
