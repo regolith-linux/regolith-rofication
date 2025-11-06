@@ -1,3 +1,4 @@
+import argparse
 import re
 import struct
 import subprocess
@@ -62,12 +63,26 @@ def call_rofi(entries: Iterable[str], additional_args: List[str] = None) -> (int
         return -1, exit_code
 
 
+class RoficationOptions:
+    def __init__(self) -> None:
+        self.delete_seen = False
+
+    def __repr__(self):
+        return str(self.__dict__)
+
+    def parse_args(self):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--delete_seen', action='store_true',
+                            help='Auto delete seen notification')
+        parser.parse_args(namespace=self)
+
+
 class RoficationGui():
     def __init__(self, client: RoficationClient = None):
         self._client: RoficationClient = RoficationClient() if client is None else client
         self._tsformat = Resource(env_name='i3xrocks_notify_timestamp_format', xres_name='i3xrocks.notify.timestamp.format', default='').fetch()
 
-    def run(self) -> None:
+    def run(self, options: RoficationOptions = None) -> None:
         selected = 0
         while selected >= 0:
             notifications = []
@@ -110,6 +125,11 @@ class RoficationGui():
                 # Seen notification
                 elif exit_code == 11:
                     self._client.see(notifications[selected].id)
+                    if options and options.delete_seen:
+                        self._client.delete(notifications[selected].id)
+                        # This was the last notification
+                        if len(notifications) == 1:
+                            break
                 # Dismiss all notifications for application
                 elif exit_code == 13:
                     self._client.delete_all(notifications[selected].application)
