@@ -2,19 +2,41 @@ import json
 import os
 import threading
 import time
-from typing import Iterable, Iterator, MutableMapping, Mapping, Optional
+from subprocess import CalledProcessError
+from typing import Iterable, Iterator, MutableMapping, Mapping, Optional, Tuple
 from warnings import warn
 
 from ._notification import Notification, CloseReason, Urgency
-from ._util import Event
+from ._util import Event, Resource
 
 ALLOWED_TO_EXPIRE = ('notify-send',)
+# Default list of applications that keep at most one notification in the queue.
 SINGLE_NOTIFICATION_APPS = ('VLC media player',)
+
+single_notification_apps_resource = Resource(env_name='i3xrocks_notify_single_notification_apps',
+                                             xres_name='i3xrocks.notify.single_notification_apps',
+                                             default=', '.join(SINGLE_NOTIFICATION_APPS))
+
+
+def parse_app_list(value: str) -> Tuple[str, ...]:
+    """Split a comma-separated list of application names."""
+    return tuple(app.strip() for app in value.split(',') if app.strip())
+
+
+def fetch_single_notification_apps() -> Tuple[str, ...]:
+    try:
+        return parse_app_list(single_notification_apps_resource.fetch())
+    except (OSError, CalledProcessError):
+        # no resource getter available: keep the built-in default
+        return SINGLE_NOTIFICATION_APPS
 
 
 class NotificationQueue:
-    def __init__(self, mapping: Mapping[int, Notification] = None) -> None:
+    def __init__(self, mapping: Mapping[int, Notification] = None,
+                 single_notification_apps: Iterable[str] = None) -> None:
         self._lock = threading.Lock()
+        self._single_notification_apps: Tuple[str, ...] = fetch_single_notification_apps() \
+            if single_notification_apps is None else tuple(single_notification_apps)
         self._last_id: int = max(mapping.keys()) + 1 if mapping else 1
         self._mapping: MutableMapping[int, Notification] = {} if mapping is None else dict(mapping)
         self.notification_seen = Event()
@@ -62,7 +84,7 @@ class NotificationQueue:
 
     def put(self, notification: Notification) -> None:
         to_replace: Optional[int]
-        if notification.application in SINGLE_NOTIFICATION_APPS:
+        if notification.application in self._single_notification_apps:
             # replace notification for applications that only allow one
             to_replace = next((ntf.id for ntf in self._mapping.values()
                                if ntf.application == notification.application), None)
