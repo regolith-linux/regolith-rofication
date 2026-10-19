@@ -1,8 +1,10 @@
+import signal
 import time
 from typing import Tuple, Sequence, Mapping
 
 from dbus import service, SessionBus
 from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
 from gi.repository.GLib import MainLoop
 
 from ._metadata import ROFICATION_VERSION, ROFICATION_NAME, ROFICATION_URL
@@ -84,6 +86,16 @@ class RoficationDbusService:
         self._object = RoficationDbusObject(queue)
         # create GLib mainloop, this is needed to make D-Bus work and takes care of catching signals.
         self._loop = MainLoop()
+        # Stop the loop on the signals a session or the user sends to end the daemon, so the caller
+        # gets to save the queue. Without this, SIGTERM kills the process before the queue is saved
+        # and SIGINT is ignored while the loop runs.
+        for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, self._quit_on_signal, signum)
+
+    def _quit_on_signal(self, signum: int) -> bool:
+        print(f'Received signal {signum}, stopping')
+        self._loop.quit()
+        return GLib.SOURCE_REMOVE
 
     def run(self) -> None:
         self._loop.run()
