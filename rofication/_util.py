@@ -1,6 +1,6 @@
 import os
 from collections.abc import MutableSequence, Callable
-from subprocess import check_output
+from subprocess import CalledProcessError, check_output
 from typing import Optional
 
 class Event:
@@ -27,9 +27,18 @@ class Resource:
         if self.env_name:
             env_val = os.getenv(self.env_name)
 
-        # avoid calling xrescat if the environment variable is set
-        if env_val is None:
-            cmd = ('xrescat', self.xres_name, self.default)
-            return check_output(cmd, universal_newlines=True)
-        else:
+        # avoid calling a resource getter if the environment variable is set
+        if env_val is not None:
             return env_val
+
+        # Regolith reads resources with xrescat (X11) or trawlcat (Wayland);
+        # either may be missing, so try both and fall back to the default.
+        getters = ('xrescat', 'trawlcat')
+        if os.getenv('XDG_SESSION_TYPE') == 'wayland':
+            getters = getters[::-1]
+        for getter in getters:
+            try:
+                return check_output((getter, self.xres_name, self.default), universal_newlines=True)
+            except (OSError, CalledProcessError):
+                continue
+        return self.default
