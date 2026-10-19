@@ -13,8 +13,8 @@ ALLOWED_TO_EXPIRE = ('notify-send',)
 # Default list of applications that keep at most one notification in the queue.
 SINGLE_NOTIFICATION_APPS = ('VLC media player',)
 
-single_notification_apps_resource = Resource(env_name='i3xrocks_notify_single_notification_apps',
-                                             xres_name='i3xrocks.notify.single_notification_apps',
+single_notification_apps_resource = Resource(env_name='rofication_notify_single_notification_apps',
+                                             xres_name='rofication.notify.single_notification_apps',
                                              default=', '.join(SINGLE_NOTIFICATION_APPS))
 
 

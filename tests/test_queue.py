@@ -8,8 +8,8 @@ from unittest import mock
 from rofication._notification import Notification
 from rofication._queue import NotificationQueue
 
-XRES_NAME = 'i3xrocks.notify.single_notification_apps'
-ENV_NAME = 'i3xrocks_notify_single_notification_apps'
+XRES_NAME = 'rofication.notify.single_notification_apps'
+ENV_NAME = 'rofication_notify_single_notification_apps'
 
 
 def notification(application, summary='s', nid=0):

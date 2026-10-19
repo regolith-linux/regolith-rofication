@@ -53,11 +53,11 @@ unix-socket. It is just a simple storage for notifications.
 
 Some applications should only ever have one notification in the queue: a new notification from
 them replaces the previous one. The daemon reads this list of application names (comma-separated)
-at startup from the Xresource `i3xrocks.notify.single_notification_apps`, or from the environment
-variable `i3xrocks_notify_single_notification_apps`. The default is `VLC media player`. Example:
+at startup from the Xresource `rofication.notify.single_notification_apps`, or from the environment
+variable `rofication_notify_single_notification_apps`. The default is `VLC media player`. Example:
 
 ```
-i3xrocks.notify.single_notification_apps: VLC media player, Spotify
+rofication.notify.single_notification_apps: VLC media player, Spotify
 ```
 
 ## Notification
