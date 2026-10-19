@@ -1,7 +1,7 @@
 import re
 import struct
 import subprocess
-from typing import Iterable, List
+from typing import Iterable, List, Tuple
 from datetime import datetime
 
 from gi.repository import GLib
@@ -12,22 +12,49 @@ from ._util import Resource
 
 HTML_TAGS_PATTERN = re.compile(r'<[^>]*?>')
 
-ROFI_COMMAND = ('rofi',
-                '-dmenu',
-                '-p', 'Notifications',
-                '-markup',
-                '-kb-accept-entry', 'Control+j,Control+m,KP_Enter',
-                '-kb-remove-char-forward', 'Control+d',
-                '-kb-delete-entry', '',
-                '-kb-custom-1', 'Delete',
-                '-kb-custom-2', 'Return',
-                '-kb-custom-3', 'Alt+r',
-                '-kb-custom-4', 'Shift+Delete',
-                '-markup-rows',
-                '-sep', '\\0',
-                '-format', 'i',
-                '-eh', '2',
-                '-lines', '10')
+# rofi key bindings and their defaults. Each one can be overridden with the
+# Xresource rofication.notify.<option> (for example rofication.notify.kb-custom-1)
+# or the environment variable rofication_notify_<option> with '-' replaced by '_'.
+# kb-custom-1..4 make rofi exit with codes 10..13, handled in RoficationGui.run().
+KEYBINDINGS = (('kb-accept-entry', 'Control+j,Control+m,KP_Enter'),
+               ('kb-remove-char-forward', 'Control+d'),
+               ('kb-delete-entry', ''),
+               ('kb-custom-1', 'Delete'),        # dismiss notification
+               ('kb-custom-2', 'Return'),        # mark notification as seen
+               ('kb-custom-3', 'Alt+r'),         # refresh
+               ('kb-custom-4', 'Shift+Delete'))  # dismiss all notifications of the application
+
+ROFI_COMMAND_START = ('rofi',
+                      '-dmenu',
+                      '-p', 'Notifications',
+                      '-markup')
+ROFI_COMMAND_END = ('-markup-rows',
+                    '-sep', '\\0',
+                    '-format', 'i',
+                    '-eh', '2',
+                    '-lines', '10')
+
+
+def keybinding_resource(option: str, default: str) -> Resource:
+    return Resource(env_name='rofication_notify_' + option.replace('-', '_'),
+                    xres_name='rofication.notify.' + option,
+                    default=default)
+
+
+def make_rofi_command(keybindings: Iterable[Tuple[str, str]]) -> Tuple[str, ...]:
+    kb_args = []
+    for option, binding in keybindings:
+        kb_args += ['-' + option, binding]
+    return ROFI_COMMAND_START + tuple(kb_args) + ROFI_COMMAND_END
+
+
+def fetch_keybindings() -> List[Tuple[str, str]]:
+    return [(option, keybinding_resource(option, default).fetch().strip())
+            for option, default in KEYBINDINGS]
+
+
+# rofi command with the default key bindings
+ROFI_COMMAND = make_rofi_command(KEYBINDINGS)
 
 
 def strip_tags(value: str) -> str:
@@ -41,8 +68,8 @@ def rofi_entry(notification: Notification, tsformat: str) -> str:
     formatted_ts = f"{datetime.fromtimestamp(notification.timestamp).strftime(tsformat)} " if tsformat else ""
     return f'<b>{formatted_ts}{stripped_summ}</b> <small>({stripped_app})</small>\n<small>{stripped_body}</small>'
 
-def call_rofi(entries: Iterable[str], additional_args: List[str] = None) -> (int, int):
-    command = ROFI_COMMAND
+def call_rofi(entries: Iterable[str], additional_args: List[str] = None,
+              command: Iterable[str] = ROFI_COMMAND) -> (int, int):
     if additional_args is not None:
         command = list(command) + additional_args
 
@@ -66,6 +93,7 @@ class RoficationGui():
     def __init__(self, client: RoficationClient = None):
         self._client: RoficationClient = RoficationClient() if client is None else client
         self._tsformat = Resource(env_name='i3xrocks_notify_timestamp_format', xres_name='i3xrocks.notify.timestamp.format', default='').fetch()
+        self._rofi_command = make_rofi_command(fetch_keybindings())
 
     def run(self) -> None:
         selected = 0
@@ -98,7 +126,7 @@ class RoficationGui():
                 args.append(str(selected))
 
             # Show rofi
-            selected, exit_code = call_rofi(entries, args)
+            selected, exit_code = call_rofi(entries, args, self._rofi_command)
 
             if selected >= 0:
                 # Dismiss notification
