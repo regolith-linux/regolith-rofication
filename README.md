@@ -65,27 +65,27 @@ The **Rofication** GUI consists of a small Python script wrapping **Rofi**. The 
 to view notifications, mark them as seen and dismiss them.
 
 The keys are passed to rofi as `-kb-*` options. Each one can be changed with the Xresource
-`i3xrocks.notify.<option>`, or the environment variable `i3xrocks_notify_<option>` with `-`
-replaced by `_` (for example `i3xrocks_notify_kb_custom_1`). The values use rofi's key binding
+`rofication.notify.<option>`, or the environment variable `rofication_notify_<option>` with `-`
+replaced by `_` (for example `rofication_notify_kb_custom_1`). The values use rofi's key binding
 syntax. A comma separates alternative keys, and an empty value unbinds the action.
 
-| Xresource                                 | Action                                    | Default                         |
-|-------------------------------------------|-------------------------------------------|---------------------------------|
-| `i3xrocks.notify.kb-custom-1`             | Dismiss the notification                  | `Delete`                        |
-| `i3xrocks.notify.kb-custom-2`             | Mark the notification as seen             | `Return`                        |
-| `i3xrocks.notify.kb-custom-3`             | Refresh the list                          | `Alt+r`                         |
-| `i3xrocks.notify.kb-custom-4`             | Dismiss all notifications of the app      | `Shift+Delete`                  |
-| `i3xrocks.notify.kb-accept-entry`         | rofi `kb-accept-entry` (close the viewer) | `Control+j,Control+m,KP_Enter`  |
-| `i3xrocks.notify.kb-remove-char-forward`  | rofi `kb-remove-char-forward`             | `Control+d`                     |
-| `i3xrocks.notify.kb-delete-entry`         | rofi `kb-delete-entry`                    | (none)                          |
+| Xresource                                  | Action                                    | Default                        |
+|--------------------------------------------|-------------------------------------------|--------------------------------|
+| `rofication.notify.kb-custom-1`            | Dismiss the notification                  | `Delete`                       |
+| `rofication.notify.kb-custom-2`            | Mark the notification as seen             | `Return`                       |
+| `rofication.notify.kb-custom-3`            | Refresh the list                          | `Alt+r`                        |
+| `rofication.notify.kb-custom-4`            | Dismiss all notifications of the app      | `Shift+Delete`                 |
+| `rofication.notify.kb-accept-entry`        | rofi `kb-accept-entry` (close the viewer) | `Control+j,Control+m,KP_Enter` |
+| `rofication.notify.kb-remove-char-forward` | rofi `kb-remove-char-forward`             | `Control+d`                    |
+| `rofication.notify.kb-delete-entry`        | rofi `kb-delete-entry`                    | (none)                         |
 
 The last three free `Return`, `Delete` and `Shift+Delete` from rofi's default bindings. A key
 must be bound to only one rofi action: if you pick a key that your rofi configuration already uses
 for another action (see `rofi -dump-config`), unbind it there. Example:
 
 ```
-i3xrocks.notify.kb-custom-1: Control+x
-i3xrocks.notify.kb-custom-2: Control+s,Return
+rofication.notify.kb-custom-1: Control+x
+rofication.notify.kb-custom-2: Control+s,Return
 ```
 
 ## CLI

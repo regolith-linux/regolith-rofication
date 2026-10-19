@@ -96,13 +96,13 @@ class KeybindingsTest(unittest.TestCase):
         self.gui_command()
         with open(os.path.join(self.bin, 'lookups')) as fp:
             lookups = fp.read().splitlines()
-        expected = [f'i3xrocks.notify.{option}={option_value(LEGACY_ROFI_COMMAND, "-" + option)}'
+        expected = [f'rofication.notify.{option}={option_value(LEGACY_ROFI_COMMAND, "-" + option)}'
                     for option in KB_OPTIONS]
         for line in expected:
             self.assertIn(line, lookups)
 
     def test_resource_overrides_one_binding(self):
-        self.stub_resources({'i3xrocks.notify.kb-custom-1': 'Control+x'})
+        self.stub_resources({'rofication.notify.kb-custom-1': 'Control+x'})
         command = self.gui_command()
         self.assertEqual(option_value(command, '-kb-custom-1'), 'Control+x')
         expected = list(LEGACY_ROFI_COMMAND)
@@ -110,7 +110,7 @@ class KeybindingsTest(unittest.TestCase):
         self.assertEqual(command, tuple(expected))
 
     def test_resource_overrides_every_binding(self):
-        values = {f'i3xrocks.notify.{option}': f'Super+{n}' for n, option in enumerate(KB_OPTIONS)}
+        values = {f'rofication.notify.{option}': f'Super+{n}' for n, option in enumerate(KB_OPTIONS)}
         self.stub_resources(values)
         command = self.gui_command()
         for n, option in enumerate(KB_OPTIONS):
@@ -118,13 +118,13 @@ class KeybindingsTest(unittest.TestCase):
         self.assertEqual(len(command), len(LEGACY_ROFI_COMMAND))
 
     def test_environment_variable_wins(self):
-        self.stub_resources({'i3xrocks.notify.kb-custom-2': 'Control+s'})
-        command = self.gui_command({'i3xrocks_notify_kb_custom_2': 'Control+Return'})
+        self.stub_resources({'rofication.notify.kb-custom-2': 'Control+s'})
+        command = self.gui_command({'rofication_notify_kb_custom_2': 'Control+Return'})
         self.assertEqual(option_value(command, '-kb-custom-2'), 'Control+Return')
 
     def test_run_passes_bindings_to_rofi(self):
         # rofi stub: record argv, select row 0 with kb-custom-1 (exit 10) once, then cancel
-        self.stub_resources({'i3xrocks.notify.kb-custom-1': 'Control+x'})
+        self.stub_resources({'rofication.notify.kb-custom-1': 'Control+x'})
         self.stub('rofi', 'while IFS= read -r _; do :; done\n'
                           'log="${0%/*}/rofi.log"\n'
                           'for a in "$@"; do printf "%s\\n" "$a" >> "$log"; done; echo -- >> "$log"\n'

@@ -13,8 +13,8 @@ from ._util import Resource
 HTML_TAGS_PATTERN = re.compile(r'<[^>]*?>')
 
 # rofi key bindings and their defaults. Each one can be overridden with the
-# Xresource i3xrocks.notify.<option> (for example i3xrocks.notify.kb-custom-1)
-# or the environment variable i3xrocks_notify_<option> with '-' replaced by '_'.
+# Xresource rofication.notify.<option> (for example rofication.notify.kb-custom-1)
+# or the environment variable rofication_notify_<option> with '-' replaced by '_'.
 # kb-custom-1..4 make rofi exit with codes 10..13, handled in RoficationGui.run().
 KEYBINDINGS = (('kb-accept-entry', 'Control+j,Control+m,KP_Enter'),
                ('kb-remove-char-forward', 'Control+d'),
@@ -36,8 +36,8 @@ ROFI_COMMAND_END = ('-markup-rows',
 
 
 def keybinding_resource(option: str, default: str) -> Resource:
-    return Resource(env_name='i3xrocks_notify_' + option.replace('-', '_'),
-                    xres_name='i3xrocks.notify.' + option,
+    return Resource(env_name='rofication_notify_' + option.replace('-', '_'),
+                    xres_name='rofication.notify.' + option,
                     default=default)
 
 
