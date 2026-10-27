@@ -27,6 +27,11 @@ class Notification:
         self.hints: Mapping[str, any] = {}
         self.timestamp = None
 
+    @property
+    def transient(self) -> bool:
+        """The sender set the spec's "transient" hint: show it, but keep it out of the saved queue."""
+        return isinstance(self.hints, Mapping) and bool(self.hints.get('transient', False))
+
     def asdict(self) -> Mapping[str, any]:
         return {field: value for field, value in vars(self).items() if value is not None}
 
