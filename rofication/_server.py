@@ -83,8 +83,20 @@ class RoficationServer(ThreadedUnixStreamServer):
             os.remove(server_address)
         super().__init__(server_address, RoficationRequestHandler)
         self.queue: NotificationQueue = queue
+        self._socket_file = _file_identity(server_address)
 
     def __exit__(self, *args) -> None:
         super().__exit__(*args)
-        # removes the UNIX socket after use
-        os.remove(self.server_address)
+        # Remove the UNIX socket after use, unless it is gone or no longer ours: a daemon started
+        # since then removes it at start-up and binds its own socket at the same path. Raising here
+        # would also stop rofication-daemon before it saves the queue.
+        try:
+            if _file_identity(self.server_address) == self._socket_file:
+                os.remove(self.server_address)
+        except FileNotFoundError:
+            pass
+
+
+def _file_identity(path: str) -> tuple:
+    st = os.stat(path)
+    return st.st_dev, st.st_ino, st.st_ctime_ns
