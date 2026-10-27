@@ -31,13 +31,20 @@ def fetch_single_notification_apps() -> Tuple[str, ...]:
         return SINGLE_NOTIFICATION_APPS
 
 
+def next_id_filename(filename: str) -> str:
+    """The file next to the queue file that keeps the next notification ID."""
+    return os.path.splitext(filename)[0] + '.next-id'
+
+
 class NotificationQueue:
     def __init__(self, mapping: Mapping[int, Notification] = None,
-                 single_notification_apps: Iterable[str] = None) -> None:
+                 single_notification_apps: Iterable[str] = None, next_id: int = 1) -> None:
         self._lock = threading.Lock()
         self._single_notification_apps: Tuple[str, ...] = fetch_single_notification_apps() \
             if single_notification_apps is None else tuple(single_notification_apps)
-        self._last_id: int = max(mapping.keys()) + 1 if mapping else 1
+        # IDs are never handed out twice, also across restarts (the spec allows reuse only after
+        # MAXINT notifications): continue after the highest ID kept in the queue or used before.
+        self._last_id: int = max([next_id, *(nid + 1 for nid in mapping or {})])
         self._mapping: MutableMapping[int, Notification] = {} if mapping is None else dict(mapping)
         self.notification_seen = Event()
         self.notification_closed = Event()
@@ -61,6 +68,11 @@ class NotificationQueue:
             warn('Failed to save notification queue')
             if os.path.exists(filename):
                 os.unlink(filename)
+        try:
+            with open(next_id_filename(filename), 'w') as f:
+                f.write(f'{self._last_id}\n')
+        except OSError:
+            warn('Failed to save the next notification ID')
 
     def see(self, nid: int) -> None:
         if nid in self._mapping:
@@ -116,9 +128,15 @@ class NotificationQueue:
 
     @classmethod
     def load(cls, filename: str) -> 'NotificationQueue':
+        try:
+            with open(next_id_filename(filename), 'r') as f:
+                next_id = int(f.read())
+        except (OSError, ValueError):
+            next_id = 1
+
         if not os.path.exists(filename):
             print('Creating empty notification queue')
-            return cls({})
+            return cls({}, next_id=next_id)
 
         try:
             print('Loading notification queue from file')
@@ -128,4 +146,4 @@ class NotificationQueue:
             warn('Failed to load notification queue')
             mapping = {}
 
-        return cls(mapping)
+        return cls(mapping, next_id=next_id)
