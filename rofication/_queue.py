@@ -71,16 +71,17 @@ class NotificationQueue:
             return
         warn(f'Unable to find notification {nid}')
 
-    def remove(self, nid: int) -> None:
+    def remove(self, nid: int, reason: CloseReason = CloseReason.DISMISSED) -> None:
         if nid in self._mapping:
             print(f'Removing: {nid}')
-            del self._mapping[nid]
+            notification = self._mapping.pop(nid)
+            self.notification_closed.notify(notification, reason)
             return
         warn(f'Unable to find notification {nid}')
 
-    def remove_all(self, nids: Iterable[int]) -> None:
+    def remove_all(self, nids: Iterable[int], reason: CloseReason = CloseReason.DISMISSED) -> None:
         for nid in nids:
-            self.remove(nid)
+            self.remove(nid, reason)
 
     def put(self, notification: Notification) -> None:
         to_replace: Optional[int]

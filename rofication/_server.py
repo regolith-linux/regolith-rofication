@@ -4,7 +4,7 @@ import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
 from typing import TextIO
 
-from ._notification import Urgency, Notification
+from ._notification import CloseReason, Urgency, Notification
 from ._queue import NotificationQueue
 from ._static import ROFICATION_UNIX_SOCK
 
@@ -29,18 +29,18 @@ class RoficationRequestHandler(BaseRequestHandler):
 
     def delete(self, nid: int) -> None:
         with self.server.queue.lock:
-            self.server.queue.remove(nid)
+            self.server.queue.remove(nid, CloseReason.DISMISSED)
 
     def delete_multi(self, ids: str) -> None:
         with self.server.queue.lock:
             to_remove = [int(i) for i in ids.split(',')]
-            self.server.queue.remove_all(to_remove)
+            self.server.queue.remove_all(to_remove, CloseReason.DISMISSED)
 
     def delete_all(self, application: str) -> None:
         with self.server.queue.lock:
             to_remove = [n.id for n in self.server.queue
                          if n.application == application]
-            self.server.queue.remove_all(to_remove)
+            self.server.queue.remove_all(to_remove, CloseReason.DISMISSED)
 
     def list(self, fp: TextIO) -> None:
         with self.server.queue.lock:
