@@ -49,7 +49,8 @@ class RoficationDbusObject(service.Object):
 
     @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='', out_signature='as')
     def GetCapabilities(self) -> Sequence[str]:
-        return 'actions', 'body'
+        # the queue keeps every notification until the user dismisses it or the sender closes it
+        return 'actions', 'body', 'persistence'
 
     @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='', out_signature='ssss')
     def GetServerInformation(self) -> Tuple[str, str, str, str]:

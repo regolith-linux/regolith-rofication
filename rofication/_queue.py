@@ -56,7 +56,9 @@ class NotificationQueue:
         try:
             print('Saving notification queue to file')
             with open(filename, 'w') as f:
-                json.dump(list(self._mapping.values()), f, default=Notification.asdict)
+                # transient notifications by-pass persistence: they don't come back after a restart
+                json.dump([ntf for ntf in self._mapping.values() if not ntf.transient], f,
+                          default=Notification.asdict)
         except:
             warn('Failed to save notification queue')
             if os.path.exists(filename):
@@ -108,7 +110,7 @@ class NotificationQueue:
         now = time.time()
         to_remove = [ntf.id for ntf in self._mapping.values()
                      if ntf.deadline and ntf.deadline < now
-                     and ntf.application in ALLOWED_TO_EXPIRE]
+                     and (ntf.application in ALLOWED_TO_EXPIRE or ntf.transient)]
         if to_remove:
             print(f'Expired: {to_remove}')
             for nid in to_remove:
@@ -124,7 +126,9 @@ class NotificationQueue:
         try:
             print('Loading notification queue from file')
             with open(filename, 'r') as f:
-                mapping = {n.id: n for n in json.load(f, object_hook=Notification.make)}
+                # decode only the top-level objects, so each notification keeps its hints as a dict
+                notifications = [Notification.make(dct) for dct in json.load(f)]
+            mapping = {n.id: n for n in notifications if not n.transient}
         except:
             warn('Failed to load notification queue')
             mapping = {}
