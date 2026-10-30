@@ -8,7 +8,7 @@ from gi.repository import GLib
 from gi.repository.GLib import MainLoop
 
 from ._metadata import ROFICATION_VERSION, ROFICATION_NAME, ROFICATION_URL
-from ._notification import Notification, Urgency
+from ._notification import CloseReason, Notification, Urgency
 from ._queue import NotificationQueue
 from datetime import datetime
 
@@ -45,7 +45,7 @@ class RoficationDbusObject(service.Object):
     @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='u', out_signature='')
     def CloseNotification(self, id: int) -> None:
         with self._queue.lock:
-            self._queue.remove(id)
+            self._queue.remove(id, CloseReason.CLOSED)
 
     @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='', out_signature='as')
     def GetCapabilities(self) -> Sequence[str]:
