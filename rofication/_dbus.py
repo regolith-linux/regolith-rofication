@@ -59,7 +59,7 @@ class RoficationDbusObject(service.Object):
     def NotificationClosed(self, id_in, reason_in):
         pass
 
-    @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='susssasa{ss}i', out_signature='u')
+    @service.method(NOTIFICATIONS_DBUS_INTERFACE, in_signature='susssasa{sv}i', out_signature='u')
     def Notify(self, app_name: str, replaces_id: int, app_icon: str, summary: str,
                body: str, actions: Sequence[str], hints: Mapping[str, any], expire_timeout: int) -> int:
         notification = Notification()
