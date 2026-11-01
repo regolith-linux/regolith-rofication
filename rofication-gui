@@ -2,7 +2,11 @@
 
 import sys
 
-from rofication import RoficationGui, RoficationClient
+from rofication import RoficationGui, RoficationClient, RoficationOptions
+
 
 if __name__ == '__main__':
-    RoficationGui(RoficationClient(sys.stdout)).run()
+    options = RoficationOptions()
+    options.parse_args()
+
+    RoficationGui(RoficationClient(sys.stdout)).run(options)

@@ -3,7 +3,7 @@
 import os
 from typing import Union
 
-from rofication import RoficationGui, RoficationClient, resources, Resource
+from rofication import RoficationGui, RoficationClient, RoficationOptions, resources, Resource
 
 if __name__ == '__main__':
     # defaults
@@ -12,12 +12,15 @@ if __name__ == '__main__':
     value_color: Resource = resources.value_color
     value_font: Resource = resources.value_font
 
+    options = RoficationOptions()
+    options.parse_args()
+
     num: Union[int, str]
     try:
         client = RoficationClient()
 
         if os.getenv('button'):
-            RoficationGui(client).run()
+            RoficationGui(client).run(options)
 
         num, crit = client.count()
         if num > 0:
