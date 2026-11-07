@@ -47,6 +47,7 @@ class NotificationQueue:
         self._last_id: int = max([next_id, *(nid + 1 for nid in mapping or {})])
         self._mapping: MutableMapping[int, Notification] = {} if mapping is None else dict(mapping)
         self.notification_seen = Event()
+        self.notification_action = Event()
         self.notification_closed = Event()
 
     def __len__(self) -> int:
@@ -77,11 +78,14 @@ class NotificationQueue:
             warn('Failed to save the next notification ID')
 
     def see(self, nid: int) -> None:
+        self.invoke(nid, 'default')
+
+    def invoke(self, nid: int, action_key: str) -> None:
         if nid in self._mapping:
-            print(f'Seeing: {nid}')
+            print(f'Invoking {action_key!r} on: {nid}')
             notification = self._mapping[nid]
             notification.urgency = Urgency.NORMAL
-            self.notification_seen.notify(notification)
+            self.notification_action.notify(notification, action_key)
             return
         warn(f'Unable to find notification {nid}')
 

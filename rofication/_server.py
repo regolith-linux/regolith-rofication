@@ -50,6 +50,10 @@ class RoficationRequestHandler(BaseRequestHandler):
         with self.server.queue.lock:
             self.server.queue.see(nid)
 
+    def invoke(self, nid: int, action_key: str) -> None:
+        with self.server.queue.lock:
+            self.server.queue.invoke(nid, action_key)
+
     def handle(self) -> None:
         with self.server.queue.lock:
             self.server.queue.cleanup()
@@ -74,6 +78,9 @@ class RoficationRequestHandler(BaseRequestHandler):
             elif cmd == 'see':
                 # see an item, set the urgency to normal and activate
                 self.see(nid=int(args[0]))
+            elif cmd == 'invoke':
+                # run one of an item's actions; 'default' is the same as seeing it
+                self.invoke(nid=int(args[0]), action_key=':'.join(args[1:]))
 
 
 class RoficationServer(ThreadedUnixStreamServer):

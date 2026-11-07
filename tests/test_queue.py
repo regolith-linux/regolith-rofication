@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from rofication._notification import Notification
+from rofication._notification import Notification, Urgency
 from rofication._queue import NotificationQueue
 
 XRES_NAME = 'rofication.notify.single_notification_apps'
@@ -19,6 +19,37 @@ def notification(application, summary='s', nid=0):
     ntf.summary = summary
     ntf.body = ''
     return ntf
+
+
+class InvokeTest(unittest.TestCase):
+    """Running a notification's actions: observers get (notification, key)."""
+
+    def queue_with_one(self):
+        queue = NotificationQueue({}, ())
+        queue.put(notification('app', 's'))
+        return queue, next(iter(queue)).id
+
+    def test_invoke_emits_the_action(self):
+        queue, nid = self.queue_with_one()
+        actions = []
+        queue.notification_action += lambda ntf, key: actions.append((ntf.id, key))
+        queue.invoke(nid, 'reply')
+        self.assertEqual(actions, [(nid, 'reply')])
+        self.assertEqual(next(iter(queue)).urgency, Urgency.NORMAL)
+
+    def test_see_is_the_default_action(self):
+        queue, nid = self.queue_with_one()
+        actions = []
+        queue.notification_action += lambda ntf, key: actions.append((ntf.id, key))
+        queue.see(nid)
+        self.assertEqual(actions, [(nid, 'default')])
+
+    def test_invoke_unknown_notification_does_nothing(self):
+        queue, _ = self.queue_with_one()
+        actions = []
+        queue.notification_action += lambda ntf, key: actions.append(key)
+        queue.invoke(4242, 'reply')
+        self.assertEqual(actions, [])
 
 
 class SingleNotificationAppsTest(unittest.TestCase):
