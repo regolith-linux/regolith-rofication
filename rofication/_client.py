@@ -43,3 +43,6 @@ class RoficationClient:
 
     def see(self, nid: int) -> None:
         self._send('see', nid)
+
+    def invoke(self, nid: int, action_key: str) -> None:
+        self._send('invoke', f'{nid}:{action_key}')
