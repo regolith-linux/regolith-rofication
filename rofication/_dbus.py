@@ -27,11 +27,11 @@ class RoficationDbusObject(service.Object):
         )
         self._queue: NotificationQueue = queue
 
-        def notification_seen(notification):
-            if 'default' in notification.actions:
-                self.ActionInvoked(notification.id, 'default')
+        def notification_action(notification, action_key):
+            if action_key in notification.actions[0::2]:
+                self.ActionInvoked(notification.id, action_key)
 
-        self._queue.notification_seen += notification_seen
+        self._queue.notification_action += notification_action
 
         def notification_closed(notification, reason):
             self.NotificationClosed(notification.id, reason)
