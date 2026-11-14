@@ -69,6 +69,54 @@ class FakeDbusService:
             pass
 
 
+class RequestTest(unittest.TestCase):
+    """Requests on the socket: the argument is everything after the first colon, and a bad
+    notification id is ignored without breaking the server."""
+
+    def setUp(self):
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        self.path = os.path.join(self._dir.name, 'rofi_notification_daemon')
+        self.queue = NotificationQueue({}, ())
+        for nid, app in ((1, 'App'), (2, 'App:Sub'), (3, 'App')):
+            ntf = notification(nid, f'from {app}')
+            ntf.application = app
+            self.queue.put(ntf)
+        self.server = RoficationServer(self.queue, self.path)
+        self.server.start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+
+    def request(self, line):
+        with socket.socket(socket.AF_UNIX) as client:
+            client.connect(self.path)
+            client.sendall(line.encode() + b'\n')
+            client.shutdown(socket.SHUT_WR)
+            reply = b''
+            while chunk := client.recv(4096):
+                reply += chunk
+        return reply.decode()
+
+    def apps(self):
+        return sorted(n.application for n in self.queue)
+
+    def test_dela_with_colon_in_application(self):
+        self.request('dela:App:Sub')
+        self.assertEqual(self.apps(), ['App', 'App'])
+
+    def test_dela_without_colon(self):
+        self.request('dela:App')
+        self.assertEqual(self.apps(), ['App:Sub'])
+
+    def test_bad_ids_are_ignored(self):
+        with mock.patch.object(self.server, 'handle_error') as handle_error:
+            for line in ('del:abc', 'del', 'see:', 'delm:', 'delm:1,x'):
+                self.request(line)
+        handle_error.assert_not_called()
+        self.assertEqual(self.apps(), ['App', 'App', 'App:Sub'])
+        self.assertEqual(self.request('num'), '3,0')
+
+
 class DaemonSavesQueueTest(unittest.TestCase):
     def test_saves_queue_when_its_socket_was_removed(self):
         with tempfile.TemporaryDirectory() as home:

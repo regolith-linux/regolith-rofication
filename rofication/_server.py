@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
 from typing import TextIO
@@ -55,25 +56,31 @@ class RoficationRequestHandler(BaseRequestHandler):
             self.server.queue.cleanup()
 
         with self.request.makefile(mode='rw', encoding='utf-8') as fp:
-            cmd, *args = fp.readline().strip().split(':')
-            if cmd == 'num':
-                # get number of notifications
-                self.count(fp)
-            elif cmd == 'del':
-                # dismiss an item.
-                self.delete(nid=int(args[0]))
-            elif cmd == 'delm':
-                # dismiss list of notifications.
-                self.delete_multi(ids=args[0])
-            elif cmd == 'dela':
-                # dismiss all items from an application.
-                self.delete_all(application=args[0])
-            elif cmd == 'list':
-                # getting a listing.
-                self.list(fp)
-            elif cmd == 'see':
-                # see an item, set the urgency to normal and activate
-                self.see(nid=int(args[0]))
+            # The command ends at the first colon; the rest is its argument, colons included
+            # (application names can contain them).
+            cmd, _, arg = fp.readline().strip().partition(':')
+            try:
+                if cmd == 'num':
+                    # get number of notifications
+                    self.count(fp)
+                elif cmd == 'del':
+                    # dismiss an item.
+                    self.delete(nid=int(arg))
+                elif cmd == 'delm':
+                    # dismiss list of notifications.
+                    self.delete_multi(ids=arg)
+                elif cmd == 'dela':
+                    # dismiss all items from an application.
+                    self.delete_all(application=arg)
+                elif cmd == 'list':
+                    # getting a listing.
+                    self.list(fp)
+                elif cmd == 'see':
+                    # see an item, set the urgency to normal and activate
+                    self.see(nid=int(arg))
+            except ValueError:
+                # a notification id that isn't a number: nothing to do
+                print(f'rofication: ignored the request {cmd!r} with argument {arg!r}', file=sys.stderr)
 
 
 class RoficationServer(ThreadedUnixStreamServer):
