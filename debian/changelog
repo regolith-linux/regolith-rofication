@@ -1,3 +1,20 @@
+regolith-rofication (1.6.0) focal; urgency=medium
+
+  [ Carlos Fernandez Sanz ]
+  * fix: do not crash rofication-gui when xrescat is missing (#25)
+  * fix: save the notification queue when the daemon is stopped by a signal (#28)
+  * feat: make the single-notification app list configurable (#26)
+  * feat: make the rofication-gui key bindings configurable (#27)
+  * fix: emit NotificationClosed when a notification is closed or dismissed (#29)
+  * fix: declare the Notify hints as a{sv} (#30)
+  * fix: advertise persistence and keep transient notifications out of the saved queue (#31)
+  * fix: don't reuse notification IDs after a restart (#32)
+  * fix: save the queue when the daemon's socket was removed (#33)
+  * fix: keep notifications whose urgency hint is out of range or not a number (#35)
+  * fix: take everything after the first colon as a socket request's argument (#36)
+
+ -- Regolith Linux <regolith.linux@gmail.com>  Sat, 14 Nov 2026 08:55:36 -0800
+
 regolith-rofication (1.5.3) focal; urgency=medium
 
   [ zackattackz ]
