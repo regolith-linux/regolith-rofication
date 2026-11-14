@@ -55,6 +55,15 @@ class VariantHintsTest(unittest.TestCase):
         queue, nid = self.notify({'urgency': dbus.Byte(2)})
         self.assertEqual([(n.id, n.urgency) for n in queue], [(nid, Urgency.CRITICAL)])
 
+    def test_urgency_out_of_range_is_normal(self):
+        queue, nid = self.notify({'urgency': dbus.Byte(99)})
+        self.assertEqual([(n.id, n.urgency) for n in queue], [(nid, Urgency.NORMAL)])
+
+    def test_urgency_not_a_number_is_normal(self):
+        for value in (dbus.String('high'), dbus.Dictionary({'a': dbus.Int32(1)}, signature='sv')):
+            queue, nid = self.notify({'urgency': value})
+            self.assertEqual([(n.id, n.urgency) for n in queue], [(nid, Urgency.NORMAL)], repr(value))
+
     def test_mixed_hints_are_saved(self):
         image = dbus.Struct((dbus.Int32(1), dbus.Int32(1), dbus.Int32(4), dbus.Boolean(True), dbus.Int32(8),
                              dbus.Int32(4), dbus.Array([dbus.Byte(1), dbus.Byte(2), dbus.Byte(3), dbus.Byte(4)])),
