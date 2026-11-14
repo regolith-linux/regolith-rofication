@@ -16,8 +16,14 @@ if __name__ == '__main__':
     try:
         client = RoficationClient()
 
-        if os.getenv('button'):
-            RoficationGui(client).run()
+        button = os.getenv('button')
+        if button == '2':
+            # middle click toggles do-not-disturb
+            do_not_disturb = client.do_not_disturb('toggle')
+        else:
+            if button:
+                RoficationGui(client).run()
+            do_not_disturb = client.do_not_disturb()
 
         num, crit = client.count()
         if num > 0:
@@ -25,6 +31,8 @@ if __name__ == '__main__':
             value_color = resources.warning_color
         if crit > 0:
             value_color = resources.critical_color
+        if do_not_disturb:
+            label_icon = resources.notify_dnd
     except (FileNotFoundError, ConnectionRefusedError):
         label_icon = resources.notify_error
         label_color = resources.critical_color

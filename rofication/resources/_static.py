@@ -8,6 +8,7 @@ value_font = Resource(env_name='font', xres_name='i3xrocks.value.font', default=
 notify_none = Resource(env_name='i3xrocks_label_notify_none', xres_name='i3xrocks.label.notify.none', default='N')
 notify_some = Resource(env_name='i3xrocks_label_notify_some', xres_name='i3xrocks.label.notify.some', default='N')
 notify_error = Resource(env_name='i3xrocks_label_notify_error', xres_name='i3xrocks.label.notify.error', default='N')
+notify_dnd = Resource(env_name='i3xrocks_label_notify_dnd', xres_name='i3xrocks.label.notify.dnd', default='Z')
 
 value_color = Resource(env_name='color', xres_name='i3xrocks.value.color', default='#E6E1CF')
 label_color = Resource(env_name='label_color', xres_name='i3xrocks.label.color', default='#E6E1CF')

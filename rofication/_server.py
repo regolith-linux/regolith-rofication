@@ -3,7 +3,7 @@ import os
 import sys
 import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
-from typing import TextIO
+from typing import TextIO, Optional
 
 from ._notification import CloseReason, Urgency, Notification
 from ._queue import NotificationQueue
@@ -51,6 +51,18 @@ class RoficationRequestHandler(BaseRequestHandler):
         with self.server.queue.lock:
             self.server.queue.see(nid)
 
+    def do_not_disturb(self, fp: TextIO, mode: Optional[str]) -> None:
+        with self.server.queue.lock:
+            queue = self.server.queue
+            if mode == 'on':
+                queue.set_do_not_disturb(True)
+            elif mode == 'off':
+                queue.set_do_not_disturb(False)
+            elif mode == 'toggle':
+                queue.set_do_not_disturb(not queue.do_not_disturb)
+            fp.write('on' if queue.do_not_disturb else 'off')
+            fp.flush()
+
     def handle(self) -> None:
         with self.server.queue.lock:
             self.server.queue.cleanup()
@@ -78,6 +90,9 @@ class RoficationRequestHandler(BaseRequestHandler):
                 elif cmd == 'see':
                     # see an item, set the urgency to normal and activate
                     self.see(nid=int(arg))
+                elif cmd == 'dnd':
+                    # get or set (on, off, toggle) do-not-disturb, answer with the mode in force
+                    self.do_not_disturb(fp, mode=arg or None)
             except ValueError:
                 # a notification id that isn't a number: nothing to do
                 print(f'rofication: ignored the request {cmd!r} with argument {arg!r}', file=sys.stderr)
