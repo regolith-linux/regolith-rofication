@@ -16,6 +16,15 @@ NOTIFICATIONS_DBUS_INTERFACE = 'org.freedesktop.Notifications'
 NOTIFICATIONS_DBUS_OBJECT_PATH = '/org/freedesktop/Notifications'
 
 
+def urgency_from_hint(value) -> Urgency:
+    """The urgency of a Notify() urgency hint. The specification defines 0, 1 and 2; any other
+    value, or one that isn't a number, is taken as normal, so the notification isn't lost."""
+    try:
+        return Urgency(int(value))
+    except (TypeError, ValueError):
+        return Urgency.NORMAL
+
+
 class RoficationDbusObject(service.Object):
     def __init__(self, queue: NotificationQueue) -> None:
         super().__init__(
@@ -75,7 +84,7 @@ class RoficationDbusObject(service.Object):
         if int(expire_timeout) > 0:
             notification.deadline = time.time() + expire_timeout / 1000.0
         if 'urgency' in hints:
-            notification.urgency = Urgency(int(hints['urgency']))
+            notification.urgency = urgency_from_hint(hints['urgency'])
         with self._queue.lock:
             self._queue.put(notification)
         return notification.id
