@@ -60,6 +60,55 @@ variable `rofication_notify_single_notification_apps`. The default is `VLC media
 rofication.notify.single_notification_apps: VLC media player, Spotify
 ```
 
+### Pop-ups
+
+Pop-ups are off by default: new notifications only join the queue, as they always have. To turn
+them on, set `rofication.popup.min_urgency` to the lowest urgency that should show one (`low`,
+`normal` or `critical`) and restart the daemon:
+
+```
+rofication.popup.min_urgency: normal
+```
+
+When pop-ups are on and the daemon runs with a display (`DISPLAY` or `WAYLAND_DISPLAY`), a new
+notification briefly shows as a card in the top right corner of the screen: a gtk-layer-shell
+overlay on Wayland, a window the window manager leaves alone on X11. Cards never take the keyboard
+focus. The newest card is at the top; at most `max_visible` cards show at once and further ones
+wait their turn.
+
+A card closes when its lifetime ends (the notification stays in the queue), when the notification
+leaves the queue, or when it is clicked. A left click invokes the notification's `default` action
+and dismisses it (unless the sender set the `resident` hint), or marks the notification as seen
+when it has no `default` action. A right click only closes the card. The other actions are buttons
+on the card. Critical cards stay until they are closed; notifications loaded from the saved queue
+at startup are not shown again.
+
+Each setting is read from the environment variable named like the Xresource with `.` replaced by
+`_` (for example `rofication_popup_max_visible`), then from the Xresource. Invalid values mean the
+default.
+
+| Xresource                              | Meaning                                                    | Default   |
+|----------------------------------------|------------------------------------------------------------|-----------|
+| `rofication.popup.background`          | Card colour                                                | `#2E3440` |
+| `rofication.popup.critical.background` | Card colour of critical notifications                      | `#BF616A` |
+| `rofication.popup.foreground`          | Text colour                                                | `#ECEFF4` |
+| `rofication.popup.min_urgency`         | Lowest urgency shown: `low`, `normal`, `critical`, `none`  | `none`    |
+| `rofication.popup.max_visible`         | Most cards on screen at once                               | `3`       |
+| `rofication.popup.timeout.low`         | Lifetime (ms) of low urgency cards when the sender says -1 | `5000`    |
+| `rofication.popup.timeout.normal`      | Lifetime (ms) of normal cards when the sender says -1      | `8000`    |
+
+### Do not disturb
+
+While do-not-disturb is on, only critical notifications show as cards (if pop-ups are on); the
+others are still queued and counted. The mode is kept in `~/.cache/rofication/do-not-disturb` across restarts. It is
+the `DoNotDisturb` property of the `org.regolith.Rofication1` interface on
+`/org/regolith/Rofication` (bus name `org.regolith.Rofication`), the socket command
+`dnd[:on|off|toggle]`, and the `rofication-dnd [on|off|toggle|status]` command:
+
+```
+rofication-dnd toggle
+```
+
 ## Notification
 
 **Rofication** does not implement its own 'widget' to display notifications. Instead it can be
@@ -67,6 +116,10 @@ easily integrated into existing tools.  Currently we ship a small script to inte
 [`i3-blocks`](https://github.com/vivien/i3blocks). This shows the number of notifications and
 signals when there are critical notifications. Ideally there should be several small scripts that
 implement this for different desktop environments.
+
+While do-not-disturb is on, the blocklet shows the icon `i3xrocks.label.notify.dnd` (environment
+variable `i3xrocks_label_notify_dnd`, default `Z`). A middle click (`button=2`) toggles
+do-not-disturb; other clicks open the GUI.
 
 ## GUI
 

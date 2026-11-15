@@ -36,9 +36,23 @@ def next_id_filename(filename: str) -> str:
     return os.path.splitext(filename)[0] + '.next-id'
 
 
+def do_not_disturb_filename(filename: str) -> str:
+    """The file in the queue's directory that keeps the do-not-disturb mode."""
+    return os.path.join(os.path.dirname(filename), 'do-not-disturb')
+
+
+def load_do_not_disturb(filename: str) -> bool:
+    try:
+        with open(do_not_disturb_filename(filename), 'r') as f:
+            return f.read().strip() == 'on'
+    except OSError:
+        return False
+
+
 class NotificationQueue:
     def __init__(self, mapping: Mapping[int, Notification] = None,
-                 single_notification_apps: Iterable[str] = None, next_id: int = 1) -> None:
+                 single_notification_apps: Iterable[str] = None, next_id: int = 1,
+                 do_not_disturb: bool = False) -> None:
         self._lock = threading.Lock()
         self._single_notification_apps: Tuple[str, ...] = fetch_single_notification_apps() \
             if single_notification_apps is None else tuple(single_notification_apps)
@@ -46,8 +60,14 @@ class NotificationQueue:
         # MAXINT notifications): continue after the highest ID kept in the queue or used before.
         self._last_id: int = max([next_id, *(nid + 1 for nid in mapping or {})])
         self._mapping: MutableMapping[int, Notification] = {} if mapping is None else dict(mapping)
+        self._do_not_disturb: bool = bool(do_not_disturb)
+        # notification added or replaced by a sender
+        self.notification_put = Event()
         self.notification_seen = Event()
         self.notification_closed = Event()
+        # the user invoked one of the notification's actions
+        self.notification_action = Event()
+        self.do_not_disturb_changed = Event()
 
     def __len__(self) -> int:
         return len(self._mapping)
@@ -58,6 +78,33 @@ class NotificationQueue:
     @property
     def lock(self) -> threading.Lock:
         return self._lock
+
+    def get(self, nid: int) -> Optional[Notification]:
+        return self._mapping.get(nid)
+
+    @property
+    def do_not_disturb(self) -> bool:
+        return self._do_not_disturb
+
+    def set_do_not_disturb(self, enabled: bool) -> bool:
+        """Switch do-not-disturb on or off; returns whether the mode changed."""
+        enabled = bool(enabled)
+        if enabled == self._do_not_disturb:
+            return False
+        print(f'Do not disturb: {"on" if enabled else "off"}')
+        self._do_not_disturb = enabled
+        self.do_not_disturb_changed.notify(enabled)
+        return True
+
+    def save_do_not_disturb(self, filename: str) -> None:
+        """Keep the do-not-disturb mode next to the queue file, without touching the queue file."""
+        path = do_not_disturb_filename(filename)
+        try:
+            with open(path + '.tmp', 'w') as f:
+                f.write('on\n' if self._do_not_disturb else 'off\n')
+            os.replace(path + '.tmp', path)
+        except OSError:
+            warn('Failed to save the do-not-disturb mode')
 
     def save(self, filename: str) -> None:
         try:
@@ -75,6 +122,7 @@ class NotificationQueue:
                 f.write(f'{self._last_id}\n')
         except OSError:
             warn('Failed to save the next notification ID')
+        self.save_do_not_disturb(filename)
 
     def see(self, nid: int) -> None:
         if nid in self._mapping:
@@ -82,6 +130,13 @@ class NotificationQueue:
             notification = self._mapping[nid]
             notification.urgency = Urgency.NORMAL
             self.notification_seen.notify(notification)
+            return
+        warn(f'Unable to find notification {nid}')
+
+    def invoke(self, nid: int, action_key: str) -> None:
+        if nid in self._mapping:
+            print(f'Invoking {action_key!r} on: {nid}')
+            self.notification_action.notify(self._mapping[nid], action_key)
             return
         warn(f'Unable to find notification {nid}')
 
@@ -111,12 +166,12 @@ class NotificationQueue:
             notification.id = to_replace
             print(f'Replacing: {notification.id}')
             self._mapping[notification.id] = notification
-            return
-
-        notification.id = self._last_id
-        self._last_id += 1
-        print(f'Adding: {notification.id}')
-        self._mapping[notification.id] = notification
+        else:
+            notification.id = self._last_id
+            self._last_id += 1
+            print(f'Adding: {notification.id}')
+            self._mapping[notification.id] = notification
+        self.notification_put.notify(notification)
 
     def cleanup(self) -> None:
         now = time.time()
@@ -137,9 +192,11 @@ class NotificationQueue:
         except (OSError, ValueError):
             next_id = 1
 
+        do_not_disturb = load_do_not_disturb(filename)
+
         if not os.path.exists(filename):
             print('Creating empty notification queue')
-            return cls({}, next_id=next_id)
+            return cls({}, next_id=next_id, do_not_disturb=do_not_disturb)
 
         try:
             print('Loading notification queue from file')
@@ -151,4 +208,4 @@ class NotificationQueue:
             warn('Failed to load notification queue')
             mapping = {}
 
-        return cls(mapping, next_id=next_id)
+        return cls(mapping, next_id=next_id, do_not_disturb=do_not_disturb)

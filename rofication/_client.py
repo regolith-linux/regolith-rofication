@@ -1,6 +1,6 @@
 import json
 import socket
-from typing import TextIO, Sequence
+from typing import TextIO, Sequence, Optional
 
 from ._notification import Notification
 from ._static import ROFICATION_UNIX_SOCK, nullio
@@ -43,3 +43,11 @@ class RoficationClient:
 
     def see(self, nid: int) -> None:
         self._send('see', nid)
+
+    def do_not_disturb(self, mode: Optional[str] = None) -> bool:
+        """Read do-not-disturb, or set it with mode 'on', 'off' or 'toggle'; returns the mode in force."""
+        command = 'dnd' if mode is None else f'dnd:{mode}'
+        with self._client_socket() as sck:
+            sck.send(bytes(f'{command}\n', encoding='utf-8'))
+            with sck.makefile(mode='r', encoding='utf-8') as fp:
+                return fp.read().strip() == 'on'

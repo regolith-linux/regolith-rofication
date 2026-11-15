@@ -6,6 +6,7 @@ Build-Depends: debhelper (>= 11),
                dh-python,
                python3-gi (>= 3.26.1),
                python3-dbus (>= 1.2.6),
+               gir1.2-gtk-3.0,
 	       python3-setuptools,
                python3-all
 Standards-Version: 4.1.3
@@ -20,9 +21,15 @@ Depends: ${misc:Depends},
          ${python3:Depends},
          ${shlibs:Depends},
          python3-gi (>= 3.26.1),
-         python3-dbus (>= 1.2.6)
+         python3-dbus (>= 1.2.6),
+         gir1.2-gtk-3.0,
+         gir1.2-gtklayershell-0.1
 Provides: notification-daemon
 Replaces: notification-daemon
 Conflicts: notify-osd, dunst
 Description: Rofication notification system
  Rofication provides an unobtrusive notification system.
+ .
+ New notifications join a list shown on demand. Optionally, setting
+ rofication.popup.min_urgency also shows them as pop-up cards; pop-ups are
+ off by default. A do-not-disturb mode keeps non-critical pop-ups away.

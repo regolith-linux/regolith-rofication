@@ -2,7 +2,36 @@
 
 import os
 from pathlib import Path
-from rofication import RoficationServer, NotificationQueue, RoficationDbusService
+
+from gi.repository import GLib
+
+from rofication import RoficationServer, NotificationQueue, RoficationDbusService, RoficationPopups
+
+
+def save_on_change(queue: NotificationQueue, filename: str) -> None:
+    """Save the queue soon after it changes. Pop-ups connect the daemon to the display, and GTK ends
+    the process at once when the display goes away (at the end of the session), before the queue
+    could be saved on the way out."""
+    pending = False
+
+    def save() -> bool:
+        nonlocal pending
+        with queue.lock:
+            pending = False
+            queue.save(filename)
+        return GLib.SOURCE_REMOVE
+
+    def changed(*_) -> None:
+        # queue events come with the queue locked; several changes in a row are saved once
+        nonlocal pending
+        if not pending:
+            pending = True
+            GLib.idle_add(save)
+
+    queue.notification_put += changed
+    queue.notification_seen += changed
+    queue.notification_closed += changed
+
 
 if __name__ == '__main__':
     queue_dir = os.path.expanduser('~/.cache/rofication')
@@ -10,7 +39,13 @@ if __name__ == '__main__':
 
     queue_file = os.path.join(queue_dir, "notifications.json")
     not_queue = NotificationQueue.load(queue_file)
+    # keep do-not-disturb across restarts as soon as it changes, next to the queue file
+    not_queue.do_not_disturb_changed += lambda enabled: not_queue.save_do_not_disturb(queue_file)
     service = RoficationDbusService(not_queue)
+    # notifications loaded from the file are not shown again, only new ones get a pop-up
+    popups = RoficationPopups.start(not_queue)
+    if popups is not None:
+        save_on_change(not_queue, queue_file)
 
     with RoficationServer(not_queue) as server:
         server.start()

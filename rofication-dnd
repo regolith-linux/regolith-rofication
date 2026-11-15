@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+
+import sys
+
+from rofication import RoficationClient
+
+USAGE = 'usage: rofication-dnd [on|off|toggle|status]'
+COMMANDS = ('on', 'off', 'toggle', 'status')
+
+if __name__ == '__main__':
+    args = sys.argv[1:]
+    command = args[0] if args else 'status'
+    if len(args) > 1 or command not in COMMANDS:
+        print(USAGE, file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        enabled = RoficationClient().do_not_disturb(None if command == 'status' else command)
+    except OSError as error:
+        print(f'rofication-dnd: cannot reach the notification daemon: {error}', file=sys.stderr)
+        sys.exit(1)
+
+    print('on' if enabled else 'off')
