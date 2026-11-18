@@ -60,6 +60,13 @@ variable `rofication_notify_single_notification_apps`. The default is `VLC media
 rofication.notify.single_notification_apps: VLC media player, Spotify
 ```
 
+The daemon listens on the UNIX socket `rofi_notification_daemon` in `$XDG_RUNTIME_DIR`, or in
+`/tmp/rofication-<uid>` when that variable isn't set; only the user running it can connect. The old
+path `/tmp/rofi_notification_daemon` is made a link to that socket, for clients that still use it.
+One daemon runs per user: a daemon started while another one runs with the same runtime directory or
+the same saved queue exits. Start it with `--replace` to stop the running daemon and take over all
+the notifications it holds.
+
 ## Notification
 
 **Rofication** does not implement its own 'widget' to display notifications. Instead it can be

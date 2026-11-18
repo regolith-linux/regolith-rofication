@@ -1,9 +1,10 @@
+import errno
 import json
 import os
 import threading
 import time
 from subprocess import CalledProcessError
-from typing import Iterable, Iterator, MutableMapping, Mapping, Optional, Tuple
+from typing import Iterable, Iterator, List, MutableMapping, Mapping, Optional, Sequence, Tuple, Union
 from warnings import warn
 
 from ._notification import Notification, CloseReason, Urgency
@@ -46,6 +47,9 @@ class NotificationQueue:
         # MAXINT notifications): continue after the highest ID kept in the queue or used before.
         self._last_id: int = max([next_id, *(nid + 1 for nid in mapping or {})])
         self._mapping: MutableMapping[int, Notification] = {} if mapping is None else dict(mapping)
+        # when set, the next ID is written there before one is handed out, so that IDs aren't
+        # handed out twice even when the daemon is killed before it saves the queue
+        self.next_id_file: Optional[str] = None
         self.notification_seen = Event()
         self.notification_closed = Event()
 
@@ -70,11 +74,31 @@ class NotificationQueue:
             warn('Failed to save notification queue')
             if os.path.exists(filename):
                 os.unlink(filename)
+        self.save_next_id(next_id_filename(filename))
+
+    def save_next_id(self, filename: str) -> None:
         try:
-            with open(next_id_filename(filename), 'w') as f:
-                f.write(f'{self._last_id}\n')
+            self._write_next_id(filename, self._last_id)
         except OSError:
             warn('Failed to save the next notification ID')
+
+    @staticmethod
+    def _write_next_id(filename: str, next_id: int) -> None:
+        """Record next_id in filename, or raise OSError. The file is overwritten in place by a single
+        write instead of being emptied first, so a daemon killed meanwhile never leaves it empty."""
+        data = f'{next_id}\n'.encode('ascii')
+        fd = os.open(filename, os.O_WRONLY | os.O_CREAT | os.O_CLOEXEC, 0o666)
+        try:
+            if os.pwrite(fd, data, 0) != len(data):
+                raise OSError(errno.EIO, 'short write', filename)
+            os.ftruncate(fd, len(data))
+        finally:
+            os.close(fd)
+
+    @property
+    def next_id(self) -> int:
+        """The ID the next new notification gets."""
+        return self._last_id
 
     def see(self, nid: int) -> None:
         if nid in self._mapping:
@@ -98,6 +122,8 @@ class NotificationQueue:
             self.remove(nid, reason)
 
     def put(self, notification: Notification) -> None:
+        """Add or replace a notification. Raises OSError, leaving the queue as it was, when a new ID
+        is needed and the next ID can't be recorded."""
         to_replace: Optional[int]
         if notification.application in self._single_notification_apps:
             # replace notification for applications that only allow one
@@ -113,8 +139,12 @@ class NotificationQueue:
             self._mapping[notification.id] = notification
             return
 
-        notification.id = self._last_id
-        self._last_id += 1
+        nid = self._last_id
+        if self.next_id_file:
+            # the record must cover an ID before it is handed out
+            self._write_next_id(self.next_id_file, nid + 1)
+        notification.id = nid
+        self._last_id = nid + 1
         print(f'Adding: {notification.id}')
         self._mapping[notification.id] = notification
 
@@ -130,7 +160,7 @@ class NotificationQueue:
                 del self._mapping[nid]
 
     @classmethod
-    def load(cls, filename: str) -> 'NotificationQueue':
+    def _read(cls, filename: str) -> Tuple[Sequence[Notification], int]:
         try:
             with open(next_id_filename(filename), 'r') as f:
                 next_id = int(f.read())
@@ -139,16 +169,54 @@ class NotificationQueue:
 
         if not os.path.exists(filename):
             print('Creating empty notification queue')
-            return cls({}, next_id=next_id)
+            return [], next_id
 
         try:
             print('Loading notification queue from file')
             with open(filename, 'r') as f:
                 # decode only the top-level objects, so each notification keeps its hints as a dict
                 notifications = [Notification.make(dct) for dct in json.load(f)]
-            mapping = {n.id: n for n in notifications if not n.transient}
+            notifications = [n for n in notifications if not n.transient]
         except:
             warn('Failed to load notification queue')
-            mapping = {}
+            notifications = []
 
-        return cls(mapping, next_id=next_id)
+        return notifications, next_id
+
+    @classmethod
+    def load(cls, filename: str) -> 'NotificationQueue':
+        notifications, next_id = cls._read(filename)
+        return cls({n.id: n for n in notifications}, next_id=next_id)
+
+    @classmethod
+    def load_all(cls, sources: Sequence[Union[str, Tuple[Sequence[Notification], int]]]) -> 'NotificationQueue':
+        """Merge several queues: saved queues, given by file name, and queues held in memory by daemons
+        this one replaces, given as their notifications and next ID. Earlier sources keep their IDs; a
+        notification whose ID is taken gets a new one. A file named more than once is read once."""
+        loaded: List[Tuple[Sequence[Notification], int]] = []
+        seen = set()
+        for source in sources:
+            if isinstance(source, str):
+                if os.path.realpath(source) in seen:
+                    continue
+                seen.add(os.path.realpath(source))
+                source = cls._read(source)
+            loaded.append(source)
+        if len(loaded) == 1:
+            notifications, next_id = loaded[0]
+            return cls({n.id: n for n in notifications}, next_id=next_id)
+
+        mapping: MutableMapping[int, Notification] = {}
+        renumber = []
+        for notifications, next_id in loaded:
+            for notification in notifications:
+                if notification.id in mapping:
+                    renumber.append(notification)
+                else:
+                    mapping[notification.id] = notification
+        queue = cls(dict(sorted(mapping.items())), next_id=max([1, *(next_id for _, next_id in loaded)]))
+        for notification in renumber:
+            notification.id = queue._last_id
+            queue._last_id += 1
+            queue._mapping[notification.id] = notification
+        return queue

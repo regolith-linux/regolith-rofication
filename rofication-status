@@ -25,7 +25,8 @@ if __name__ == '__main__':
             value_color = resources.warning_color
         if crit > 0:
             value_color = resources.critical_color
-    except (FileNotFoundError, ConnectionRefusedError):
+    except (OSError, ValueError):
+        # no daemon, one of another user, or a reply that isn't a count
         label_icon = resources.notify_error
         label_color = resources.critical_color
         num = '?'

@@ -1,8 +1,10 @@
 import signal
+import sys
 import time
 from typing import Tuple, Sequence, Mapping
 
 from dbus import service, SessionBus
+from dbus.exceptions import DBusException
 from dbus.mainloop.glib import DBusGMainLoop
 from gi.repository import GLib
 from gi.repository.GLib import MainLoop
@@ -86,7 +88,14 @@ class RoficationDbusObject(service.Object):
         if 'urgency' in hints:
             notification.urgency = urgency_from_hint(hints['urgency'])
         with self._queue.lock:
-            self._queue.put(notification)
+            try:
+                self._queue.put(notification)
+            except OSError as error:
+                # without a recorded next ID, the ID could be handed out again after a crash
+                print(f'rofication: rejected a notification: cannot record the next notification ID: '
+                      f'{error.strerror}', file=sys.stderr, flush=True)
+                raise DBusException(f'cannot record the next notification ID: {error.strerror}',
+                                    name='org.freedesktop.DBus.Error.Failed')
         return notification.id
 
 
@@ -105,7 +114,10 @@ class RoficationDbusService:
     def _quit_on_signal(self, signum: int) -> bool:
         print(f'Received signal {signum}, stopping')
         self._loop.quit()
-        return GLib.SOURCE_REMOVE
+        # Keep handling the signal: removing the source would restore its default action, and a
+        # second signal (a daemon replacing this one, and the session ending) would then kill the
+        # daemon while it saves the queue or hands it over.
+        return GLib.SOURCE_CONTINUE
 
     def run(self) -> None:
         self._loop.run()

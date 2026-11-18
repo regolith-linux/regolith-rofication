@@ -2,11 +2,13 @@ import json
 import os
 import runpy
 import socket
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
 import rofication
+from rofication import _static
 from rofication._notification import Notification
 from rofication._queue import NotificationQueue
 from rofication._server import RoficationServer
@@ -121,8 +123,10 @@ class DaemonSavesQueueTest(unittest.TestCase):
     def test_saves_queue_when_its_socket_was_removed(self):
         with tempfile.TemporaryDirectory() as home:
             FakeDbusService.path = os.path.join(home, 'rofi_notification_daemon')
-            server = lambda queue: RoficationServer(queue, FakeDbusService.path)
-            with mock.patch.dict(os.environ, {'HOME': home}), \
+            server = lambda queue, *args: RoficationServer(queue, FakeDbusService.path)
+            with mock.patch.dict(os.environ, {'HOME': home, 'XDG_RUNTIME_DIR': home}), \
+                    mock.patch.object(sys, 'argv', [DAEMON]), \
+                    mock.patch.object(_static, 'ROFICATION_UNIX_SOCK', os.path.join(home, 'legacy')), \
                     mock.patch.object(rofication, 'RoficationDbusService', FakeDbusService), \
                     mock.patch.object(rofication, 'RoficationServer', server):
                 runpy.run_path(DAEMON, run_name='__main__')
