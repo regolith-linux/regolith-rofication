@@ -88,6 +88,17 @@ class DaemonTestCase(unittest.TestCase):
                 self.fail(f'no daemon with {count} notifications at {path or self.socket}')
             time.sleep(0.02)
 
+    def wait_link(self):
+        """Wait for the old shared path to be a link, and return where it leads. A daemon links it
+        only after its socket answers, and deciding whether an old socket there is still in use can
+        take a while, so a daemon that answers may not have linked it yet."""
+        deadline = time.monotonic() + TIMEOUT
+        while not os.path.islink(self.legacy):
+            if time.monotonic() > deadline:
+                self.fail(f'{self.legacy} was not linked')
+            time.sleep(0.02)
+        return os.readlink(self.legacy)
+
     def listing(self, path=None):
         return {n['summary']: n for n in json.loads(request(path or self.socket, 'list'))}
 
@@ -105,7 +116,7 @@ class SocketTest(DaemonTestCase):
         daemon = self.start(notify=['one'], umask=0o777)
         self.wait_count(1)
         self.assertEqual(stat.S_IMODE(os.lstat(self.socket).st_mode), 0o600)
-        self.assertEqual(os.readlink(self.legacy), self.socket)
+        self.assertEqual(self.wait_link(), self.socket)
         self.assertEqual(request(self.legacy, 'num'), '1,0')
         self.stop(daemon)
         self.assertFalse(os.path.lexists(self.socket))
@@ -135,7 +146,7 @@ class SocketTest(DaemonTestCase):
                 self._leave_socket(self.legacy, mode)
                 daemon = self.start()
                 self.wait_count(0)
-                self.assertEqual(os.readlink(self.legacy), self.socket)
+                self.assertEqual(self.wait_link(), self.socket)
                 self.stop(daemon)
                 self.assertFalse(os.path.lexists(self.legacy))
 
@@ -171,6 +182,7 @@ class SocketTest(DaemonTestCase):
     def test_old_path_repointed_meanwhile_is_kept(self):
         daemon = self.start()
         self.wait_count(0)
+        self.wait_link()
         os.unlink(self.legacy)
         os.symlink('/nonexistent', self.legacy)
         self.stop(daemon)
@@ -224,6 +236,7 @@ class SingleInstanceTest(DaemonTestCase):
     def test_second_daemon_exits_and_changes_nothing(self):
         first = self.start(notify=['kept'])
         self.wait_count(1)
+        self.assertEqual(self.wait_link(), self.socket)
         inode = os.lstat(self.socket).st_ino
         for env in ({}, {'XDG_RUNTIME_DIR': self._dir.name}):
             with self.subTest(env=env):
@@ -246,7 +259,7 @@ class SingleInstanceTest(DaemonTestCase):
         self.assertEqual({summary: n['id'] for summary, n in held.items()},
                          {'one': 1, 'transient two': 2, 'three': 3})
         self.assertTrue(held['transient two']['hints']['transient'])
-        self.assertEqual(os.readlink(self.legacy), self.socket)
+        self.assertEqual(self.wait_link(), self.socket)
         self.stop(second)
         self.assertEqual(self.saved(), ['one', 'three'])
 
@@ -258,7 +271,7 @@ class SingleInstanceTest(DaemonTestCase):
         second = self.start(notify=['three'])
         self.wait_count(1)
         self.assertEqual(self.listing()['three']['id'], 3)
-        self.assertEqual(os.readlink(self.legacy), self.socket)
+        self.assertEqual(self.wait_link(), self.socket)
         self.stop(second)
 
 
