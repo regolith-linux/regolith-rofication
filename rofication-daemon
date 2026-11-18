@@ -1,22 +1,53 @@
 #!/usr/bin/env python3
 
+import argparse
 import os
-from pathlib import Path
-from rofication import RoficationServer, NotificationQueue, RoficationDbusService
+import sys
+from rofication import RoficationServer, NotificationQueue, DaemonInstance, StartError, next_id_filename
 
 if __name__ == '__main__':
-    queue_dir = os.path.expanduser('~/.cache/rofication')
-    Path(queue_dir).mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description='Rofication notification daemon')
+    parser.add_argument('--replace', action='store_true',
+                        help='stop the daemon that runs with the same runtime directory or saved queue, '
+                             'and take over what it holds')
+    args = parser.parse_args()
 
+    # The daemon must be able to use the files it creates, whatever umask it was started with.
+    os.umask(os.umask(0) & 0o077)
+
+    queue_dir = os.path.expanduser('~/.cache/rofication')
     queue_file = os.path.join(queue_dir, "notifications.json")
-    not_queue = NotificationQueue.load(queue_file)
+
+    # Settle that this is the one daemon before the saved queue is read or the bus name requested.
+    instance = DaemonInstance(queue_file)
+    try:
+        handover = instance.claim(replace=args.replace)
+    except StartError as error:
+        print(f'rofication-daemon: {error}', file=sys.stderr)
+        sys.exit(1)
+
+    from rofication import RoficationDbusService
+
+    not_queue = NotificationQueue.load_all(handover.sources(queue_file))
+    not_queue.next_id_file = next_id_filename(queue_file)
+    if handover.replaced:
+        # IDs taken over or given anew are only recorded in the files of the daemons that stopped
+        not_queue.save_next_id(not_queue.next_id_file)
     service = RoficationDbusService(not_queue)
 
-    with RoficationServer(not_queue) as server:
+    with RoficationServer(not_queue, instance.socket_path) as server:
         server.start()
+        message = instance.link_legacy()
+        if message:
+            print(f'rofication-daemon: {message}', file=sys.stderr, flush=True)
         try:
             service.run()
         except:
-            server.shutdown()
+            pass
+        server.stop()
+    instance.unlink_legacy()
 
     not_queue.save(queue_file)
+    # D-Bus calls are no longer dispatched and the socket workers have finished: what the queue holds
+    # now is final, and a daemon that replaces this one takes all of it over.
+    instance.hand_over(not_queue)

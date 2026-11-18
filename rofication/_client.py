@@ -1,20 +1,29 @@
 import json
 import socket
-from typing import TextIO, Sequence
+from typing import Optional, TextIO, Sequence
 
 from ._notification import Notification
-from ._static import ROFICATION_UNIX_SOCK, nullio
+from ._runtime import client_socket_paths, connect_own
+from ._static import nullio
 
 
 class RoficationClient:
-    def __init__(self, out: TextIO = nullio, unix_socket: str = ROFICATION_UNIX_SOCK):
+    def __init__(self, out: TextIO = nullio, unix_socket: Optional[str] = None):
+        """Without unix_socket, the client tries the socket in the runtime directory of the user, then the
+        old shared path. A socket served by a process of another user counts as no daemon at all."""
         self._out: TextIO = out
-        self._unix_socket: str = unix_socket
+        self._unix_socket: Optional[str] = unix_socket
 
     def _client_socket(self) -> socket.socket:
-        sck = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sck.connect(self._unix_socket)
-        return sck
+        if self._unix_socket is not None:
+            return connect_own(self._unix_socket)
+        error = None
+        for path in client_socket_paths():
+            try:
+                return connect_own(path)
+            except OSError as e:
+                error = e
+        raise error
 
     def _send(self, command: str, arg: any) -> None:
         with self._client_socket() as sck:
@@ -24,7 +33,8 @@ class RoficationClient:
         with self._client_socket() as sck:
             sck.send(b'num\n')
             data = sck.recv(32).decode('utf-8')
-            return (int(x) for x in data.split(',', 2))
+            num, crit = data.split(',')
+            return int(num), int(crit)
 
     def delete(self, nid: int) -> None:
         self._send('del', nid)

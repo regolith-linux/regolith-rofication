@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 import sys
 import threading
 from socketserver import ThreadingMixIn, UnixStreamServer, BaseRequestHandler
@@ -8,6 +9,10 @@ from typing import TextIO
 from ._notification import CloseReason, Urgency, Notification
 from ._queue import NotificationQueue
 from ._static import ROFICATION_UNIX_SOCK
+
+
+# How long the server waits on a client for its request, and for it to take the reply.
+REQUEST_TIMEOUT = 5
 
 
 class ThreadedUnixStreamServer(ThreadingMixIn, UnixStreamServer):
@@ -52,6 +57,8 @@ class RoficationRequestHandler(BaseRequestHandler):
             self.server.queue.see(nid)
 
     def handle(self) -> None:
+        # A client that connects and sends nothing must not hold up the daemon when it stops.
+        self.request.settimeout(REQUEST_TIMEOUT)
         with self.server.queue.lock:
             self.server.queue.cleanup()
 
@@ -91,6 +98,33 @@ class RoficationServer(ThreadedUnixStreamServer):
         super().__init__(server_address, RoficationRequestHandler)
         self.queue: NotificationQueue = queue
         self._socket_file = _file_identity(server_address)
+
+    def server_bind(self) -> None:
+        # Only this user may connect, whatever umask the process was started with.
+        umask = os.umask(0o177)
+        try:
+            super().server_bind()
+        finally:
+            os.umask(umask)
+        os.chmod(self.server_address, 0o600)
+
+    def handle_error(self, request, client_address) -> None:
+        # A client that hangs up before it has the reply, or that sends nothing in time, is not an
+        # error of the server.
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, socket.timeout)):
+            return
+        super().handle_error(request, client_address)
+
+    def stop(self) -> None:
+        """Stop serving, after answering the requests already waiting on the socket."""
+        self.shutdown()
+        self.socket.setblocking(False)
+        while True:
+            try:
+                request, client_address = self.get_request()
+            except OSError:
+                break
+            self.process_request(request, client_address)
 
     def __exit__(self, *args) -> None:
         super().__exit__(*args)
